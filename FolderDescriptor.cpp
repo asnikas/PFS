@@ -17,7 +17,7 @@
 struct FolderDescriptor : Descriptor{
     int acl_addr, acl_size, file_table_addr, file_table_size;
 
-    void init(int folder_addr, int acl_addr, int acl_size, int file_table_addr, int file_table_size){
+    void init(int acl_addr, int acl_size, int file_table_addr, int file_table_size){
         // this->folder_addr = folder_addr;
         this->acl_addr = acl_addr;
         this->acl_size = acl_size;

@@ -13,7 +13,7 @@ using namespace std;
 
 struct Resolver{
     int resolve(Parser& parser, string path, int current_address, char folder_name[32], int uid){
-        vector <string> addr_parts;
+        vector <string> addr_parts; //в векторе нельзя <char[32]>, т.к это не присваиваемый тип
         string word;
         stringstream ss(path);
         while(getline(ss, word, '/')){

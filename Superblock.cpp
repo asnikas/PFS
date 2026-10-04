@@ -2,6 +2,7 @@
 
 using namespace std;
 
+#pragma once
 #pragma pack(push,1)
 struct Superblock{
     int root_dir_addr;
@@ -15,6 +16,13 @@ struct Superblock{
         this->alloc_free = alloc_free;
         this->users_table = users_table;
         this->users_table_size = users_table_size;
+    }
+
+    void save(Parser& parser, int addr){
+        parser.write(addr, reinterpret_cast<char*>(this), sizeof(Superblock));
+    }
+    void load(Parser& parser, int addr){
+        parser.read(addr, reinterpret_cast<char*>(this), sizeof(Superblock));
     }
 };
 #pragma pack(pop)

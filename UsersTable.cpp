@@ -11,9 +11,18 @@ struct UsersTable{
     vector<User> users_vec;
     Superblock& superblock;
 
+    UsersTable(Superblock& superblock) : superblock(superblock) {}
+
     int search(int id){
         for(int i = 0; i < users_vec.size(); i++){
             if(id == users_vec[i].id) return i;
+        }
+        return -1;
+    }
+
+    int search_uid_by_name(char name[32]){
+        for(int i = 0; i < users_vec.size(); i++){
+            if(memcmp(users_vec[i].name, name, 32) == 0) return users_vec[i].id;
         }
         return -1;
     }

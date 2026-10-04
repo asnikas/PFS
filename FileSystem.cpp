@@ -337,6 +337,14 @@ struct FileSystem{
     }
 
     void set_acl(int uid, char name[32], bool can_read, bool can_write, bool can_traverse = false){
+
+        UsersTable users_table = UsersTable(superblock);
+        users_table.load(parser, superblock.users_table);
+        if(users_table.search(uid) == -1){
+            cout << "Для set_acl пользователя с таким uid нет в системе" << endl;
+            return;
+        }
+
         FolderDescriptor fd;
         fd.load(parser, curr_folder);
         FileTable ft;

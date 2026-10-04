@@ -32,7 +32,9 @@ struct FileTable{
         int index = search(name);
         if(index != -1){
             table_node_vec.erase(table_node_vec.begin() + index);
+            return;
         }
+        cout << "при удалении элемента возникла ошибка (FileTable, метод remove)" << endl;
     }
 
     void save(Parser& parser, int addr){

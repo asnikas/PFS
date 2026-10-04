@@ -1,6 +1,9 @@
 #include <iostream>
 #include <string>
+#include <sstream>
 #include "FileSystem.cpp"
+
+//istringstream - берем обычную string и оборачиваем ее так, чтобы с ней можно было работать, как и с cin, 
 
 using namespace std;
 
@@ -17,7 +20,7 @@ struct Menu{
             cout << "> ";
             getline(cin, input); //читаем всю строку целиком
 
-            istringstream iss(input); //оборачиваем строку так, чтобы из нее можно было читать, как из cin
+            istringstream iss(input); //оборачиваем строку так, чтобы из нее можно было читать, как из cin, поток, который читает из готовой строки
             string command;
             iss >> command; //читает первое слово до пробела в command, остаток строки остается внутри iss
 
@@ -25,7 +28,7 @@ struct Menu{
         }
     }
 
-    void dispatch(string command, istringstream& args){
+    void dispatch(string command, istringstream& args){ //istringstream нельзя передавать по значению, только по ссылке или указателю
         if(fs.curr_uid == -1){
             if(command != "login" && command != "register" && command != "mkfs" && command != "exit"){
                 cout << "сначала выполните login" << endl;
@@ -150,5 +153,126 @@ struct Menu{
         strncpy(buffer, path.c_str(), 31);
 
         fs.mkdir(buffer, can_read, can_write, can_traverse);
+    }
+
+    void handle_read(istringstream& args){
+        string name;
+        if(!(args >> name)){ 
+            cout << "неправильные входные данные для read" << endl;
+            return;
+        }
+        char buffer[32] = {}; 
+        strncpy(buffer, name.c_str(), 31);
+
+        optional<vector <char>> output_vec = fs.read(buffer);
+        if(!output_vec.has_value()){
+            cout << "не удалось прочитать файл" << endl;
+            return;
+        }
+        vector<char> result = move(output_vec.value()); //достает сам vector<char> из optional 
+        //move пермещает байты вектора, избавляя нас от копии
+
+        cout.write(result.data(), result.size());
+        cout << endl;
+    }
+
+    void handle_write(istringstream& args){
+        string name;
+        if(!(args >> name)){ 
+            cout << "неправильные входные данные для write" << endl;
+            return;
+        }
+
+        string data;
+        getline(args, data); //забираем все, что осталось после имени
+
+        vector <char> data_buffer(data.begin(), data.end());
+
+        char buffer[32] = {}; 
+        strncpy(buffer, name.c_str(), 31);
+        fs.write(buffer, data_buffer);
+    }
+
+    void handle_get_info(istringstream& args){
+        string name;
+        if(!(args >> name)){ 
+            cout << "неправильные входные данные для get_info" << endl;
+            return;
+        }
+        char buffer[32] = {}; 
+        strncpy(buffer, name.c_str(), 31);
+        fs.get_info(buffer);
+    }
+
+    void handle_remove(istringstream& args){
+        string name;
+        if(!(args >> name)){ 
+            cout << "неправильные входные данные для remove" << endl;
+            return;
+        }
+        char buffer[32] = {}; 
+        strncpy(buffer, name.c_str(), 31);
+        fs.remove(buffer);
+    }
+
+    void handle_rename(istringstream& args){
+        string name, new_name;
+        if(!(args >> name >> new_name)){ 
+            cout << "неправильные входные данные для rename" << endl;
+            return;
+        }
+
+        char buffer[32] = {}, buffer2[32] = {};
+        strncpy(buffer, name.c_str(), 31);
+        strncpy(buffer2, new_name.c_str(), 31);
+
+        fs.rename(buffer, buffer2);
+    }
+
+    void handle_move(istringstream& args){
+        string name;
+        int dest_addr;
+
+        if(!(args >> name >> dest_addr)){ 
+            cout << "неправильные входные данные для move" << endl;
+            return;
+        }
+        char buffer[32] = {}; 
+        strncpy(buffer, name.c_str(), 31);
+        fs.move(buffer, dest_addr);
+    }
+
+    void handle_copy(istringstream& args){
+        string name;
+        int dest_addr;
+
+        if(!(args >> name >> dest_addr)){ 
+            cout << "неправильные входные данные для copy" << endl;
+            return;
+        }
+        char buffer[32] = {}; 
+        strncpy(buffer, name.c_str(), 31);
+        fs.copy(buffer, dest_addr);
+    }
+
+    void handle_set_acl(istringstream& args){
+        int uid;
+        string name;
+        bool can_read, can_write, can_traverse;
+
+        if(!(args >> uid >> name >> can_read >> can_write)){ 
+            cout << "неправильные входные данные для set_acl" << endl;
+            return;
+        }
+
+        char buffer[32] = {}; 
+        strncpy(buffer, name.c_str(), 31);
+
+        if(args >> can_traverse){
+            fs.set_acl(uid, buffer, can_read, can_write, can_traverse);
+            return;
+        }
+        fs.set_acl(uid, buffer, can_read, can_write);
+
     }
 };

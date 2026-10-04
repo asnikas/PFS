@@ -23,7 +23,6 @@ struct AuthorizedUsers{
         if(index != -1) AuthorizedUsers.erase(AuthorizedUsers.begin() + index);
         else cout << "Такого пользователя для remove в authorized users нет" << endl;
     }
-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
 
     void save(Parser& parser, int addr){
         int size = AuthorizedUsers.size();

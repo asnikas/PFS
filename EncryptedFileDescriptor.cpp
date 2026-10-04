@@ -24,11 +24,59 @@ struct EncryptedFileDescriptor : CommonFileDescriptor{
         this->owner_id = owner_id;
         this->stream_table_addr = stream_table_addr;
         this->stream_table_size = stream_table_size;
-        this->acl_addr = acl_addr;
+        this->acl_addr = acl_addr;  
         this->acl_size = acl_size;
         this->size = 0;
         this->type = 2;
         this->authorized_usr_addr = authorized_usr_addr;
+    }
+
+    void EncryptedFileDescriptor::get_info(Parser& parser){
+        CommonFileDescriptor cfd;
+        cfd.owner_id = owner_id;
+        cfd.stream_table_addr = stream_table_addr;
+        cfd.stream_table_size = stream_table_size;
+        cfd.acl_addr = acl_addr;
+        cfd.acl_size = acl_size;
+
+        cfd.get_info(parser);
+
+        cout << "Это зашифрованный файл" << endl;
+        
+        AuthorizedUsers au;
+        au.load(parser, authorized_usr_addr);
+        cout << "Авторизованных пользователей: " << au.AuthorizedUsers.size() << endl;
+    }
+
+    void EncryptedFileDescriptor::set_acl(Parser& parser, Encryption& encryption, int uid, bool can_read, bool can_write, 
+        vector <uint8_t> owner_key, vector <uint8_t> user_key){
+
+        FileACList acl;
+        acl.load(parser, acl_addr);
+        if(acl.search(uid) == -1){
+            StreamTable table;
+            AuthorizedUsers auth_users;
+            table.load(parser, stream_table_addr);
+            auth_users.load(parser, authorized_usr_addr);
+
+            auth_users.AuthorizedUsers.push_back(uid);
+
+            char name[32] = {};
+            strcpy(name, "SYMKEY");
+            int symkey_index = table.search(name);
+            int user_index = auth_users.search(uid);
+
+            if(symkey_index != -1 && user_index != -1){
+                int addr = table.stream_desc_vec[symkey_index].addr;
+                vector <uint8_t> symkey_buffer(32);
+                parser.read(addr + (user_index * 32), reinterpret_cast<char*>(symkey_buffer.data()), 32);
+                vector <uint8_t> file_key = encryption.gamma(symkey_buffer, owner_key);
+                vector <uint8_t> symkey_buffer = encryption.gamma(file_key, user_key);
+                parser.write(addr + ((auth_users.AuthorizedUsers.size() - 1) * 32), reinterpret_cast<char*>(symkey_buffer.data()), 32);
+            }
+        }
+        acl.grant(uid, can_read, can_write);
+        acl.save(parser,acl_addr);
     }
 
     optional <vector <char>> read(Parser& parser, Encryption& encryption, int uid, vector <uint8_t> user_key){
