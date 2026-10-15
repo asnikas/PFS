@@ -1,3 +1,4 @@
+#pragma once
 #include <iostream>
 #include <sstream>
 #include <cstring>
@@ -22,17 +23,17 @@ struct Resolver{
 
         FileTable table;
         FolderDescriptor folder;
+        int type;
         for(int i = 0; i < addr_parts.size(); i++){
-            int type;
             parser.read(current_address, reinterpret_cast<char*>(&type), sizeof(int));
             if(type != 3){
-                cout << "пытаемся пройти сквозь файл в resolver" << endl;
+                throw runtime_error("пытаемся пройти сквозь файл в resolver");
                 return -1;
             }
             folder.load(parser, current_address);
 
             if(!folder.can_traverse(parser, uid)){
-                cout << "пользователь с uid " << uid << " не может проходить через каталог " << string(folder_name) << endl;
+                throw runtime_error("пользователь с uid " + to_string(uid) + " не может проходить через каталог " + string(folder_name));
                 return -1;
             }
             table.load(parser, folder.file_table_addr);
@@ -42,12 +43,19 @@ struct Resolver{
             int index = table.search(buffer);
 
             if(index == -1){
-                cout << "нет элемента " << addr_parts[i] << " в каталоге " << string(folder_name) << endl;
+                throw runtime_error("нет элемента " + addr_parts[i] + " в каталоге " + string(folder_name));
                 return -1;
             }
             current_address = table.table_node_vec[index].addr;
             memcpy(folder_name, table.table_node_vec[index].name, 32);
         }
+        parser.read(current_address, reinterpret_cast<char*>(&type), sizeof(int));
+        if(type == 3){
+            folder.load(parser, current_address);
+            if(!folder.can_traverse(parser, uid)){
+                throw runtime_error("целью адреса был каталог, в который данный пользователь зайти не мог");
+            }
+        }
         return current_address;
-    }   
+    }
 };

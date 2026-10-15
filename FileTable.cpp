@@ -1,6 +1,9 @@
+#pragma once
 #include <iostream>
 #include <vector>
 #include <cstring>
+#include <string>
+#include <stdexcept>
 #include "TableNode.cpp"
 #include "Parser.cpp"
 
@@ -25,7 +28,9 @@ struct FileTable{
                 }
             }
             table_node_vec.emplace_back(name, addr);
+            return;
         }
+        throw runtime_error(string("название ") + name + " уже есть в FileTable"); //string + что-то = string
     }
 
     void remove(char name[32]){
@@ -34,7 +39,7 @@ struct FileTable{
             table_node_vec.erase(table_node_vec.begin() + index);
             return;
         }
-        cout << "при удалении элемента возникла ошибка (FileTable, метод remove)" << endl;
+        throw runtime_error("при удалении элемента возникла ошибка (FileTable, метод remove)");
     }
 
     void save(Parser& parser, int addr){

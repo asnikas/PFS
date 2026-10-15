@@ -1,12 +1,15 @@
+#pragma once
 #include <iostream>
 #include <ctime>
 #include <vector>
 #include <optional>
+#include <cstring>
 #include "StreamTable.cpp"
 #include "FileACList.cpp"
 #include "Descriptor.cpp"
 #include "Parser.cpp"
 #include "Allocator.cpp"
+#include "FileAccessEntry.cpp"
 
 #pragma pack(push,1)
 struct CommonFileDescriptor : Descriptor{
@@ -63,14 +66,7 @@ struct CommonFileDescriptor : Descriptor{
         cout << "Last time modified: " << modified_d << endl;
     }
 
-    void set_acl(Parser& parser, int uid, bool can_read, bool can_write){
-        FileACList acl;
-        acl.load(parser, acl_addr);
-        acl.grant(uid, can_read, can_write);
-        acl.save(parser,acl_addr);
-    }
-
-    optional <vector <char>> read(Parser& parser, int uid){
+    vector <char> read(Parser& parser, int uid){
         if(can_read(parser, uid)){
             StreamTable table;
             table.load(parser, stream_table_addr);
@@ -84,8 +80,9 @@ struct CommonFileDescriptor : Descriptor{
                 parser.read(addr, buffer.data(), size);
                 return buffer;
             }
+            throw runtime_error("поток MAIN не найден в файле");
         }
-        return nullopt; //сигнал "не прочитано" вместо пустого вектора
+        throw runtime_error("текущий пользователь не может прочитать файл");
     }
 
     void write(Parser& parser, int uid, vector<char> buffer, Allocator& allocator){
@@ -107,8 +104,11 @@ struct CommonFileDescriptor : Descriptor{
                 this->size = size;
                 table.save(parser, stream_table_addr);
                 parser.write(table.stream_desc_vec[index].addr, buffer.data(), size);
+                return;
             }
+            throw runtime_error("поток MAIN не найден в файле");
         }
+        throw runtime_error("текущий пользователь не может писать в этот файл");
     }
 
     void save(Parser& parser, int addr){

@@ -1,8 +1,10 @@
+#pragma once
 #include <iostream>
 #include <vector>
 #include <cstring>
 #include "StreamDescriptor.cpp"
 #include "Parser.cpp"
+#include "Allocator.cpp"
 
 using namespace std;
 
@@ -27,6 +29,23 @@ struct StreamTable{
         if(index != -1){
             stream_desc_vec.erase(stream_desc_vec.begin() + index);
         }
+    }
+
+    bool grow(Parser& parser, Allocator& allocator, int index, int need){
+        StreamDescriptor& s = stream_desc_vec[index];
+        if(need <= s.capacity) return true;
+
+        int new_addr = allocator.alloc(need);
+        if(new_addr == -1) return false;
+
+        if(s.size > 0){
+            vector<char> old(s.size);
+            parser.read(s.addr, old.data(), s.size);
+            parser.write(new_addr, old.data(), s.size);
+        }
+        s.addr = new_addr;
+        s.capacity = need;
+        return true;
     }
 
     void save(Parser& parser, int addr){

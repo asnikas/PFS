@@ -1,3 +1,5 @@
+#pragma once //сообщаем компилятору, что если файл подключали в другом .cpp, то больше его не читать 
+//(избежать дублирования)
 #include <iostream>
 #include "Superblock.cpp"
 
@@ -14,7 +16,7 @@ struct Allocator{
 
     int alloc(int size){
         if(next_free + size > image_size) {
-            cout << "образ закончился\n";
+            cout << "образ закончился";
             return -1;
         }
         int addr = next_free;
