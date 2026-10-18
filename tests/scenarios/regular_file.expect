@@ -1,0 +1,3 @@
+contains: === run 2 ===
+contains: hello message 1
+not_contains: error

@@ -1,0 +1,7 @@
+mkfs 200000 admin
+login admin
+register bob
+create_encrypted enf 1 1
+write enf this is an encrypted file
+login bob
+read enf

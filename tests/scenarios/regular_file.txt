@@ -1,0 +1,8 @@
+mkfs 200000 admin
+login admin
+register bob
+create my_first_file 1 1
+write my_first_file hello message 1
+--- restart ---
+login admin
+read my_first_file
