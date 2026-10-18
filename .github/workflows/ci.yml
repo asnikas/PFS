@@ -1,0 +1,38 @@
+# Автоматическая проверка проекта на каждый push в main и на каждый pull request:
+# сборка через CMake на чистой Ubuntu и прогон сценарных тестов (tests/run_tests.py через ctest).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:        # позволяет запустить вручную кнопкой на вкладке Actions
+
+jobs:
+  build-and-test:
+    # В названии видно, какой из двух вариантов упал
+    name: ${{ matrix.mode }}
+    runs-on: ubuntu-latest
+
+    # Матрица: одно описание, два запуска с разными параметрами
+    strategy:
+      fail-fast: false      # если упал один вариант, второй всё равно доработает до конца
+      matrix:
+        include:
+          - mode: release
+            cmake_args: -DCMAKE_BUILD_TYPE=Release
+          - mode: sanitizers      # AddressSanitizer + UBSan: ловят ошибки памяти и неопределённое поведение
+            cmake_args: -DCMAKE_BUILD_TYPE=Debug -DPFS_SANITIZE=ON
+
+    steps:
+      - name: Download the code
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build ${{ matrix.cmake_args }}
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run scenarios
+        run: ctest --test-dir build --output-on-failure
