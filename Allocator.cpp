@@ -1,30 +1,23 @@
-#pragma once //сообщаем компилятору, что если файл подключали в другом .cpp, то больше его не читать 
-//(избежать дублирования)
+#include "Allocator.h"
 #include <iostream>
-#include "Superblock.cpp"
+#include <stdexcept>
 
 using namespace std;
 
-struct Allocator{
-    int next_free;
-    int image_size; //размер образа
+Allocator::Allocator(int next_free, int image_size){
+    this->next_free = next_free;
+    this->image_size = image_size;
+}
 
-    Allocator(int next_free, int image_size){
-        this->next_free = next_free;
-        this->image_size = image_size;
+int Allocator::alloc(int size){
+    if(next_free + size > image_size) {
+        throw runtime_error("образ закончился, текущий размер - " + to_string(image_size));
     }
+    int addr = next_free;
+    next_free += size;
+    return addr;
+}
 
-    int alloc(int size){
-        if(next_free + size > image_size) {
-            cout << "образ закончился";
-            return -1;
-        }
-        int addr = next_free;
-        next_free += size;
-        return addr;
-    }
-
-    void save(Superblock& superblock){
-        superblock.alloc_free = next_free;
-    }
-};
+void Allocator::save(Superblock& superblock){
+    superblock.alloc_free = next_free;
+}

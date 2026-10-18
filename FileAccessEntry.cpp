@@ -1,17 +1,11 @@
-#pragma once
-#include <iostream>
+#include "FileAccessEntry.h"
 
 using namespace std;
 
-struct FileAccessEntry{
-    int uid;
-    bool can_read, can_write;
+FileAccessEntry::FileAccessEntry(){}
 
-    FileAccessEntry() {}
-
-    FileAccessEntry(int uid, bool can_read, bool can_write){
-        this->uid = uid;
-        this->can_read = can_read;
-        this->can_write = can_write;
-    }
-};
+FileAccessEntry::FileAccessEntry(int uid, bool can_read, bool can_write){
+    this->uid = uid;
+    this->can_read = can_read;
+    this->can_write = can_write;
+}
