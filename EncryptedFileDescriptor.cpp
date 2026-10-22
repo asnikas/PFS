@@ -60,10 +60,12 @@ bool EncryptedFileDescriptor::set_acl(Parser& parser, Allocator& allocator, Encr
             vector <uint8_t> file_key = encryption.gamma(slot, actor_key);
             vector <uint8_t> new_slot = encryption.gamma(file_key, user_key);
 
+            int old_symkey_addr = symkey.addr;
             if(!table.grow(parser, allocator, symkey_index, (new_index + 1) * 32)) return false;
             parser.write(symkey.addr + new_index * 32, reinterpret_cast<char*>(new_slot.data()), 32);
             symkey.size = (new_index + 1) * 32;
             table.save(parser, stream_table_addr);
+            if(symkey.addr != old_symkey_addr) allocator.free(old_symkey_addr); //grow уже скопировал старые слоты
         } // иначе ключа ещё нет: слоты запишет первый write
 
         auth_users.add(uid);
@@ -147,21 +149,35 @@ void EncryptedFileDescriptor::write(Parser& parser, Encryption& encryption, int 
     data_buffer = encryption.gamma(data_buffer, file_key);
     int size = data_buffer.size();
 
-    // сначала место под оба потока, потом запись
-    if(!table.grow(parser, allocator, main_index, size)) throw 
-    runtime_error("не получилось увеличить поток MAIN, закончилось место в образе");
-    if(!table.grow(parser, allocator, symkey_index, n * 32)) throw 
-    runtime_error("не получилось увеличить поток SYMKEY, закончилось место в образе");
+    //grow меняет адрес потока, если он не помещается; старые блоки освобождаем после table.save
+    int old_main_addr = table.stream_desc_vec[main_index].addr;
+    int old_symkey_addr = table.stream_desc_vec[symkey_index].addr;
 
-    table.stream_desc_vec[main_index].size = size;
-    table.stream_desc_vec[symkey_index].size = n * 32;
+    try{
+        // сначала место под оба потока, потом запись
+        if(!table.grow(parser, allocator, main_index, size)) throw
+        runtime_error("не получилось увеличить поток MAIN, закончилось место в образе");
+        if(!table.grow(parser, allocator, symkey_index, n * 32)) throw
+        runtime_error("не получилось увеличить поток SYMKEY, закончилось место в образе");
 
-    parser.write(table.stream_desc_vec[main_index].addr, reinterpret_cast<char*>(data_buffer.data()), size);
-    for(int i = 0; i < n; i++){
-        vector <uint8_t> slot = encryption.gamma(file_key, all_user_keys[i]);
-        parser.write(table.stream_desc_vec[symkey_index].addr + i * 32, reinterpret_cast<char*>(slot.data()), 32);
+        table.stream_desc_vec[main_index].size = size;
+        table.stream_desc_vec[symkey_index].size = n * 32;
+
+        parser.write(table.stream_desc_vec[main_index].addr, reinterpret_cast<char*>(data_buffer.data()), size);
+        for(int i = 0; i < n; i++){
+            vector <uint8_t> slot = encryption.gamma(file_key, all_user_keys[i]);
+            parser.write(table.stream_desc_vec[symkey_index].addr + i * 32, reinterpret_cast<char*>(slot.data()), 32);
+        }
+    }
+    catch(...){ //таблица потоков еще не сохранена: новые блоки от grow ни к чему не привязаны
+        //(например, MAIN вырос, а на SYMKEY закончилось место)
+        if(table.stream_desc_vec[main_index].addr != old_main_addr) allocator.free(table.stream_desc_vec[main_index].addr);
+        if(table.stream_desc_vec[symkey_index].addr != old_symkey_addr) allocator.free(table.stream_desc_vec[symkey_index].addr);
+        throw;
     }
     table.save(parser, stream_table_addr);
+    if(table.stream_desc_vec[main_index].addr != old_main_addr) allocator.free(old_main_addr);
+    if(table.stream_desc_vec[symkey_index].addr != old_symkey_addr) allocator.free(old_symkey_addr);
 
     this->size = size;
     modified_d = time(nullptr);

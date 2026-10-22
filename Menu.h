@@ -46,4 +46,6 @@ struct Menu{
     void handle_copy(std::istringstream& args);
 
     void handle_set_acl(std::istringstream& args);
+
+    void handle_stats(std::istringstream& args);
 };

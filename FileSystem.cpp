@@ -35,7 +35,7 @@ void FileSystem::mkfs(int image_size, char admin_name[32]){ //создать ф�
 
     check_name(admin_name);
 
-    allocator = Allocator(sizeof(Superblock), image_size);
+    allocator = Allocator(parser, sizeof(Superblock), image_size);
 
     parser.truncate(); //стереть старый образ целиком
     superblock.next_id = 0;
@@ -122,27 +122,45 @@ void FileSystem::register_user(char name[32]){
     runtime_error("Только админ может регистрировать новых пользователей");
     check_name(name);
     if(us_table.search_uid_by_name(name) == -1){
-        us_table.add(name, encryption.generate_key().data());
-        int new_addr = allocator.alloc(us_table.users_vec.size() * sizeof(User));
-        if(new_addr == -1){
-            throw runtime_error("alloc вернул -1 для register_user в FileSystem");
-        }
-        us_table.save(parser, new_addr);
-        superblock.users_table = new_addr;
-        superblock.users_table_size = us_table.users_vec.size();
-        superblock.save(parser, 0);
+        //до любых изменений: UsersTable::add меняет superblock.next_id, UsersTable::save - superblock.users_table,
+        //а sync() в меню сохраняет суперблок даже после ошибки, поэтому при откате их надо вернуть
+        int old_next_id = superblock.next_id;
+        int old_users_table_addr = superblock.users_table;
+        int old_users_table_size = superblock.users_table_size;
+        int new_addr = -1, new_acl_addr = -1, old_acl_addr = -1;
 
-        FolderDescriptor fd;
-        fd.load(parser, superblock.root_dir_addr);
-        FolderACList fd_acl;
-        fd_acl.load(parser, fd.acl_addr);
-        fd_acl.grant(us_table.users_vec.back().id, 1, 0, 1);
-        int new_acl_addr = allocator.alloc(sizeof(int) + fd_acl.ACList.size() * sizeof(FolderAccessEntry));
-        if(new_acl_addr == -1) return;
-        fd.acl_addr = new_acl_addr; 
-        fd.acl_size = fd_acl.ACList.size();
-        fd.save(parser, superblock.root_dir_addr);
-        fd_acl.save(parser, new_acl_addr);
+        try{
+            us_table.add(name, encryption.generate_key().data());
+            new_addr = allocator.alloc(us_table.users_vec.size() * sizeof(User));
+            us_table.save(parser, new_addr);
+            superblock.users_table = new_addr;
+            superblock.users_table_size = us_table.users_vec.size();
+            superblock.save(parser, 0);
+
+            FolderDescriptor fd;
+            fd.load(parser, superblock.root_dir_addr);
+            FolderACList fd_acl;
+            fd_acl.load(parser, fd.acl_addr);
+            fd_acl.grant(us_table.users_vec.back().id, 1, 0, 1);
+            new_acl_addr = allocator.alloc(sizeof(int) + fd_acl.ACList.size() * sizeof(FolderAccessEntry));
+            old_acl_addr = fd.acl_addr;
+            fd.acl_addr = new_acl_addr;
+            fd.acl_size = fd_acl.ACList.size();
+            //сначала содержимое нового ACL, потом дескриптор корня, который на него ссылается
+            fd_acl.save(parser, new_acl_addr);
+            fd.save(parser, superblock.root_dir_addr);
+        }
+        catch(...){ //пользователь не зарегистрирован: возвращаем суперблок и освобождаем новые блоки
+            superblock.next_id = old_next_id;
+            superblock.users_table = old_users_table_addr;
+            superblock.users_table_size = old_users_table_size;
+            superblock.save(parser, 0);
+            if(new_addr != -1) allocator.free(new_addr);
+            if(new_acl_addr != -1) allocator.free(new_acl_addr);
+            throw;
+        }
+        allocator.free(old_users_table_addr);
+        if(old_acl_addr != -1) allocator.free(old_acl_addr);
     }
     else{
         throw runtime_error(string("В системе уже есть пользователь с именем") + name);
@@ -189,40 +207,47 @@ void FileSystem::create(char file_name[32], bool can_read, bool can_write){
     ft.load(parser, folder.file_table_addr);
     if(ft.search(file_name) == -1){
 
-        int acl_addr = allocator.alloc(sizeof(int) + 1 * sizeof(FileAccessEntry));
-        int st_addr = allocator.alloc(sizeof(int) + 1 * sizeof(StreamDescriptor));
-        int main_addr = allocator.alloc(0);
-        int addr = allocator.alloc(sizeof(CommonFileDescriptor));
+        int acl_addr = -1, st_addr = -1, main_addr = -1, addr = -1, new_ft_addr = -1, old_ft_addr = -1;
 
-        if(acl_addr == -1 || st_addr == -1 || main_addr == -1 || addr == -1){
-            cout << "alloc вернул -1 для create в FileSystem" << endl;
-            return;
+        try{
+            acl_addr = allocator.alloc(sizeof(int) + 1 * sizeof(FileAccessEntry));
+            st_addr = allocator.alloc(sizeof(int) + 1 * sizeof(StreamDescriptor));
+            main_addr = allocator.alloc(0);
+            addr = allocator.alloc(sizeof(CommonFileDescriptor));
+
+            FileACList acl = FileACList();
+            acl.grant(curr_uid, can_read, can_write);
+            acl.save(parser, acl_addr);
+
+            StreamTable table = StreamTable();
+            char buf_table[32] = {};
+            strncpy(buf_table, "MAIN", 31);
+            table.add(buf_table, main_addr, 0, 0);
+            table.save(parser, st_addr);
+
+            CommonFileDescriptor file;
+            file.init(curr_uid, st_addr, 1, acl_addr, 1);
+            file.save(parser, addr);
+
+        
+            ft.add(file_name, addr);
+            new_ft_addr = allocator.alloc(sizeof(int) + ft.table_node_vec.size() * sizeof(TableNode));
+
+            old_ft_addr = folder.file_table_addr;
+            folder.file_table_addr = new_ft_addr;
+            folder.file_table_size = ft.table_node_vec.size();
+            ft.save(parser, new_ft_addr);
+            folder.save(parser, curr_folder);
         }
-
-        FileACList acl = FileACList();
-        acl.grant(curr_uid, can_read, can_write);
-        acl.save(parser, acl_addr);
-
-        StreamTable table = StreamTable();
-        char buf_table[32] = {};
-        strncpy(buf_table, "MAIN", 31);
-        table.add(buf_table, main_addr, 0, 0);
-        table.save(parser, st_addr);
-
-        CommonFileDescriptor file;
-        file.init(curr_uid, st_addr, 1, acl_addr, 1);
-        file.save(parser, addr);
-
-    
-        ft.add(file_name, addr);
-        int new_ft_addr = allocator.alloc(sizeof(int) + ft.table_node_vec.size() * sizeof(TableNode));
-        if(new_ft_addr == -1){
-            return;
+        catch(...){ //поймать любой тип ошибки
+            if(acl_addr != -1)allocator.free(acl_addr);
+            if(st_addr != -1) allocator.free(st_addr);
+            if(main_addr != -1) allocator.free(main_addr);  
+            if(addr != -1) allocator.free(addr);
+            if(new_ft_addr != -1) allocator.free(new_ft_addr);
+            throw;
         }
-        folder.file_table_addr = new_ft_addr;
-        folder.file_table_size = ft.table_node_vec.size();
-        ft.save(parser, new_ft_addr);
-        folder.save(parser, curr_folder);
+        if(old_ft_addr != -1) allocator.free(old_ft_addr);
         return;
     }
     throw runtime_error("при создании обычного файла выяснилось, что файл с таким именем уже есть");
@@ -239,50 +264,60 @@ void FileSystem::create_encrypted(char file_name[32], bool can_read, bool can_wr
     ft.load(parser, folder.file_table_addr);
     if(ft.search(file_name) == -1){
 
-        int acl_addr = allocator.alloc(sizeof(int) + 1 * sizeof(FileAccessEntry));
-        int st_addr = allocator.alloc(sizeof(int) + 2 * sizeof(StreamDescriptor));
-        int main_addr = allocator.alloc(0);
-        int symkey_addr = allocator.alloc(0);
-        int addr = allocator.alloc(sizeof(EncryptedFileDescriptor));
-        int auth_usrs_addr = allocator.alloc(sizeof(int) + 1 * sizeof(int));
+        int acl_addr = -1, st_addr = -1, main_addr = -1, symkey_addr = -1, addr = -1, auth_usrs_addr = -1;
+        int new_ft_addr = -1, old_ft_addr = -1;
 
-        if(acl_addr == -1 || st_addr == -1 || main_addr == -1 || symkey_addr == -1 || addr == -1 || auth_usrs_addr == -1){
-            cout << "allocator вернул -1 для create_encrypted в FileSystem" << endl;
-            return;
+        try{
+            acl_addr = allocator.alloc(sizeof(int) + 1 * sizeof(FileAccessEntry));
+            st_addr = allocator.alloc(sizeof(int) + 2 * sizeof(StreamDescriptor));
+            main_addr = allocator.alloc(0);
+            symkey_addr = allocator.alloc(0);
+            addr = allocator.alloc(sizeof(EncryptedFileDescriptor));
+            auth_usrs_addr = allocator.alloc(sizeof(int) + 1 * sizeof(int));
+
+            AuthorizedUsers usrs = AuthorizedUsers(); //новый объект, load сделать нельзя, так как прочитается мусор
+            usrs.add(curr_uid);
+            usrs.save(parser, auth_usrs_addr);
+
+            FileACList acl = FileACList();
+            acl.grant(curr_uid, can_read, can_write);
+            acl.save(parser, acl_addr);
+
+            StreamTable table = StreamTable();
+            char buf_table[32] = {};
+            strncpy(buf_table, "MAIN", 31);
+            table.add(buf_table, main_addr, 0, 0);
+            strncpy(buf_table, "SYMKEY", 31);
+            table.add(buf_table, symkey_addr, 0, 0);
+            table.save(parser, st_addr);
+
+            EncryptedFileDescriptor file;
+            file.init(curr_uid, st_addr, 2, acl_addr, 1, auth_usrs_addr);
+            file.save(parser, addr);
+
+            ft.add(file_name, addr);
+            new_ft_addr = allocator.alloc(sizeof(int) + ft.table_node_vec.size() * sizeof(TableNode));
+
+            old_ft_addr = folder.file_table_addr;
+            folder.file_table_addr = new_ft_addr;
+            folder.file_table_size = ft.table_node_vec.size();
+            ft.save(parser, new_ft_addr);
+            folder.save(parser, curr_folder);
         }
-
-        AuthorizedUsers usrs = AuthorizedUsers(); //новый объект, load сделать нельзя, так как прочитается мусор
-        usrs.add(curr_uid);
-        usrs.save(parser, auth_usrs_addr);
-
-        FileACList acl = FileACList();
-        acl.grant(curr_uid, can_read, can_write);
-        acl.save(parser, acl_addr);
-
-        StreamTable table = StreamTable();
-        char buf_table[32] = {};
-        strncpy(buf_table, "MAIN", 31);
-        table.add(buf_table, main_addr, 0, 0);
-        strncpy(buf_table, "SYMKEY", 31);
-        table.add(buf_table, symkey_addr, 0, 0);
-        table.save(parser, st_addr);
-
-        EncryptedFileDescriptor file;
-        file.init(curr_uid, st_addr, 2, acl_addr, 1, auth_usrs_addr);
-        file.save(parser, addr);
-        
-        ft.add(file_name, addr);
-        int new_ft_addr = allocator.alloc(sizeof(int) + ft.table_node_vec.size() * sizeof(TableNode));
-        if(new_ft_addr == -1){
-            return;
+        catch(...){ //поймать любой тип ошибки
+            if(acl_addr != -1) allocator.free(acl_addr);
+            if(st_addr != -1) allocator.free(st_addr);
+            if(main_addr != -1) allocator.free(main_addr);
+            if(symkey_addr != -1) allocator.free(symkey_addr);
+            if(addr != -1) allocator.free(addr);
+            if(auth_usrs_addr != -1) allocator.free(auth_usrs_addr);
+            if(new_ft_addr != -1) allocator.free(new_ft_addr);
+            throw;
         }
-        folder.file_table_addr = new_ft_addr;
-        folder.file_table_size = ft.table_node_vec.size();
-        ft.save(parser, new_ft_addr);
-        folder.save(parser, curr_folder);
+        if(old_ft_addr != -1) allocator.free(old_ft_addr);
         return;
     }
-    
+
     throw runtime_error("при создании зашифрованного файла выяснилось, что файл с таким именем уже есть");
 }
 
@@ -296,36 +331,42 @@ void FileSystem::mkdir(char folder_name[32], bool can_read, bool can_write, bool
     ft.load(parser, initial_folder.file_table_addr);
     if(ft.search(folder_name) == -1){
 
-        int acl_addr = allocator.alloc(sizeof(int) + 1 * sizeof(FolderAccessEntry));
-        int ft_addr = allocator.alloc(sizeof(int) + 0 * sizeof(TableNode));
-        int addr = allocator.alloc(sizeof(FolderDescriptor));
+        int acl_addr = -1, ft_addr = -1, addr = -1, new_ft_addr = -1, old_ft_addr = -1;
 
-        if(acl_addr == -1 || ft_addr == -1 || addr == -1){
-            cout << "allocator вернул -1 для mkdir в FileSystem" << endl;
-            return;
+        try{
+            acl_addr = allocator.alloc(sizeof(int) + 1 * sizeof(FolderAccessEntry));
+            ft_addr = allocator.alloc(sizeof(int) + 0 * sizeof(TableNode));
+            addr = allocator.alloc(sizeof(FolderDescriptor));
+
+            FolderACList acl = FolderACList();
+            acl.grant(curr_uid, can_read, can_write, can_traverse);
+            acl.save(parser, acl_addr);
+
+            FolderDescriptor folder;
+            folder.init(acl_addr, 1, ft_addr, 0);
+            folder.save(parser, addr);
+
+            FileTable new_ft = FileTable(); //создает объект вызовом автоматического конструктора,
+            //преимущество над FileTable new_ft; в том, что может занулять скалярные переменные
+            new_ft.save(parser, ft_addr);
+
+            ft.add(folder_name, addr);
+            new_ft_addr = allocator.alloc(sizeof(int) + ft.table_node_vec.size() * sizeof(TableNode));
+
+            old_ft_addr = initial_folder.file_table_addr;
+            initial_folder.file_table_addr = new_ft_addr;
+            initial_folder.file_table_size = ft.table_node_vec.size();
+            ft.save(parser, new_ft_addr);
+            initial_folder.save(parser, curr_folder);
         }
-
-        FolderACList acl = FolderACList();
-        acl.grant(curr_uid, can_read, can_write, can_traverse);
-        acl.save(parser, acl_addr);
-
-        FolderDescriptor folder;
-        folder.init(acl_addr, 1, ft_addr, 0);
-        folder.save(parser, addr);
-
-        FileTable new_ft = FileTable(); //создает объект вызовом автоматического конструктора,
-        //преимущество над FileTable new_ft; в том, что может занулять скалярные переменные
-        new_ft.save(parser, ft_addr);
-
-        ft.add(folder_name, addr);
-        int new_ft_addr = allocator.alloc(sizeof(int) + ft.table_node_vec.size() * sizeof(TableNode));
-        if(new_ft_addr == -1){
-            return;
+        catch(...){ //поймать любой тип ошибки
+            if(acl_addr != -1) allocator.free(acl_addr);
+            if(ft_addr != -1) allocator.free(ft_addr);
+            if(addr != -1) allocator.free(addr);
+            if(new_ft_addr != -1) allocator.free(new_ft_addr);
+            throw;
         }
-        initial_folder.file_table_addr = new_ft_addr;
-        initial_folder.file_table_size = ft.table_node_vec.size();
-        ft.save(parser, new_ft_addr);
-        initial_folder.save(parser, curr_folder);
+        if(old_ft_addr != -1) allocator.free(old_ft_addr);
         return;
 
     }
@@ -437,7 +478,7 @@ void FileSystem::remove(char name[32]){
     fd.load(parser, curr_folder);
     if(!fd.can_write(parser, curr_uid)) throw runtime_error(string
         ("текущий пользователь не может удалять из каталога ") + curr_folder_name);
-    fd.remove(parser, name);
+    fd.remove(parser, allocator, name);
 }
 
 void FileSystem::rename(char name[32], char new_name[32]){
@@ -504,6 +545,7 @@ void FileSystem::set_acl(int uid, char name[32], bool can_read, bool can_write, 
             acl.grant(uid, can_read, can_write);
 
             int addr = cfd.acl_addr;
+            int old_acl_addr = cfd.acl_addr;
             if(is_new){
                 addr = allocator.alloc(sizeof(int) + acl.ACList.size() * sizeof(FileAccessEntry));
                 if(addr == -1) return;               // образ закончился
@@ -512,6 +554,7 @@ void FileSystem::set_acl(int uid, char name[32], bool can_read, bool can_write, 
                 cfd.save(parser, ft.table_node_vec[index].addr);
             }
             acl.save(parser, addr);
+            if(is_new) allocator.free(old_acl_addr);
         }
 
         if(type == 2){
@@ -530,8 +573,24 @@ void FileSystem::set_acl(int uid, char name[32], bool can_read, bool can_write, 
             vector <uint8_t> actor_key(ut.users_vec[actor_idx].key, ut.users_vec[actor_idx].key + 32);
             vector <uint8_t> user_key(ut.users_vec[user_idx].key, ut.users_vec[user_idx].key + 32);
 
-            if(enfd.set_acl(parser, allocator, encryption, curr_uid, uid, can_read, can_write, actor_key, user_key)){
-                enfd.save(parser, ft.table_node_vec[index].addr);
+            int old_auth_addr = enfd.authorized_usr_addr;
+            int old_acl_addr = enfd.acl_addr;
+            bool saved = false;
+            try{
+                if(enfd.set_acl(parser, allocator, encryption, curr_uid, uid, can_read, can_write, actor_key, user_key)){
+                    enfd.save(parser, ft.table_node_vec[index].addr);
+                    saved = true;
+                }
+            }
+            catch(...){ //set_acl мог успеть выделить новый список авторизованных, а потом упасть на alloc под ACL
+                if(enfd.authorized_usr_addr != old_auth_addr) allocator.free(enfd.authorized_usr_addr);
+                if(enfd.acl_addr != old_acl_addr) allocator.free(enfd.acl_addr);
+                throw;
+            }
+            if(saved){
+                //старые блоки освобождаем только после того, как дескриптор сохранен с новыми адресами
+                if(enfd.authorized_usr_addr != old_auth_addr) allocator.free(old_auth_addr);
+                if(enfd.acl_addr != old_acl_addr) allocator.free(old_acl_addr);
             }
         }
 
@@ -548,6 +607,7 @@ void FileSystem::set_acl(int uid, char name[32], bool can_read, bool can_write, 
             acl.grant(uid, can_read, can_write, can_traverse);
 
             int addr = fod.acl_addr;
+            int old_acl_addr = fod.acl_addr;
             if(is_new){
                 addr = allocator.alloc(sizeof(int) + acl.ACList.size() * sizeof(FolderAccessEntry));
                 if(addr == -1) return;
@@ -556,6 +616,7 @@ void FileSystem::set_acl(int uid, char name[32], bool can_read, bool can_write, 
                 fod.save(parser, ft.table_node_vec[index].addr);
             }
             acl.save(parser, addr);
+            if(is_new) allocator.free(old_acl_addr);
         }
         return;
     }
@@ -570,4 +631,41 @@ void FileSystem::check_name(const string& name){
     const string allowed = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-";
     if(name.find_first_not_of(allowed) != string::npos) throw 
     runtime_error("в имени допустимы только латиница, цифры и . _ -");
+}
+
+void FileSystem::stats(){
+    int free_blocks_count = 0, taken_blocks_count = 0, max_free_block_size = 0, sum_bytes_taken = 0,
+    sum_bytes_non_taken = 0;
+    for(int i = sizeof(Superblock); i < allocator.next_free; ){
+        Header header = allocator.read_header(i);
+        if(header.free) {
+            free_blocks_count++;
+            sum_bytes_non_taken += header.size;
+            if(header.size > max_free_block_size) max_free_block_size = header.size;
+        }
+        else {
+            taken_blocks_count++;
+            sum_bytes_taken += header.size;
+        }
+        i += (sizeof(Header) + header.size + sizeof(Footer));
+    }
+    cout << "Image size: " << allocator.image_size << " bytes" << endl;
+    cout << "Superblock size: " << sizeof(Superblock) << " bytes" << endl;
+    cout << "Amount of free blocks: " << free_blocks_count << endl;
+    cout << "Amount of taken blocks: " << taken_blocks_count << endl;
+    cout << "Max free block size: " << max_free_block_size << " bytes" << endl;
+    cout << "Sum of taken bytes: " << sum_bytes_taken << endl;
+    cout << "Sum of non-taken bytes: " << sum_bytes_non_taken << endl;
+    cout << "Tail available for allocation: " << 
+    max(allocator.image_size - allocator.next_free - 9, 0) << endl;
+    cout << "Sum of service bytes (header + footer): " << 
+    (free_blocks_count + taken_blocks_count) * 9 << endl;
+    cout << "Biggest block available: " << 
+    max(max_free_block_size, max(allocator.image_size - allocator.next_free - 9, 0)) << endl;
+    cout << "Fragmentation: ";
+    if(!sum_bytes_non_taken) cout << "0 %, there are no free blocks" << endl;
+    else cout << 100 - (double)max_free_block_size / (double)sum_bytes_non_taken * 100 << " %" << endl;
+    cout << "Percent of capacity used: " << 
+    ((sizeof(Superblock) + sum_bytes_taken + free_blocks_count * 9 +
+    ((double)taken_blocks_count * 9))/(double)allocator.image_size)*100 << " %" << endl;
 }

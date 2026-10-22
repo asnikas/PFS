@@ -24,7 +24,7 @@ int main(){
     Parser parser("disk.img"); //расширение можно передать любое, оно ничего не значит для программы, 
     //важно чтобы оно было в .gitignore, дабы не залить образ на репозиторий
     Superblock superblock;
-    Allocator allocator(-1, 0);
+    Allocator allocator(parser, -1, 0);
     FileSystem filesystem(parser, allocator, superblock);
 
     bool fs_mount = filesystem.mount();

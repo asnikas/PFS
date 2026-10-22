@@ -1,7 +1,8 @@
 #pragma once
 #include "Parser.h"
 
-constexpr int MAGIC_NUM = 0x50465331; //признак самой ФС
+constexpr int MAGIC_NUM = 0x50465332; //признак самой ФС ("PFS2": формат с header/footer у блоков,
+//образы старого формата "PFS1" не монтируются)
 
 #pragma pack(push,1)
 struct Superblock{

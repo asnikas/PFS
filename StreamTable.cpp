@@ -32,9 +32,15 @@ bool StreamTable::grow(Parser& parser, Allocator& allocator, int index, int need
     if(new_addr == -1) return false;
 
     if(s.size > 0){
-        vector<char> old(s.size);
-        parser.read(s.addr, old.data(), s.size);
-        parser.write(new_addr, old.data(), s.size);
+        try{
+            vector<char> old(s.size);
+            parser.read(s.addr, old.data(), s.size);
+            parser.write(new_addr, old.data(), s.size);
+        }
+        catch(...){ //s.addr еще старый, вызывающий о новом блоке не узнает - освобождаем здесь
+            allocator.free(new_addr);
+            throw;
+        }
     }
     s.addr = new_addr;
     s.capacity = need;

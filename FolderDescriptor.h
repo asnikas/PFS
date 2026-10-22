@@ -25,7 +25,10 @@ struct FolderDescriptor : Descriptor{
 
     void add(Parser& parser, char name[32], int addr);
 
-    void remove(Parser& parser, char name[32]);
+    void remove(Parser& parser, Allocator& allocator, char name[32]);
+
+    //освобождает все блоки объекта по адресу addr (для каталога - рекурсивно вместе с содержимым)
+    void free_object(Parser& parser, Allocator& allocator, int addr);
 
     bool is_inside(Parser& parser, int root_addr, int folder_addr);
 

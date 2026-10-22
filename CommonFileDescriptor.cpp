@@ -86,15 +86,18 @@ void CommonFileDescriptor::write(Parser& parser, int uid, vector<char> buffer, A
         int index = table.search(name);
         if(index != -1){
             int size = buffer.size();
+            int old_addr = -1; //старый блок потока, если поток пришлось перевыделить
             if(size > table.stream_desc_vec[index].capacity){
                 int new_addr = allocator.alloc(size);
-                table.stream_desc_vec[index].addr = new_addr;  
-                table.stream_desc_vec[index].capacity = size; 
+                old_addr = table.stream_desc_vec[index].addr;
+                table.stream_desc_vec[index].addr = new_addr;
+                table.stream_desc_vec[index].capacity = size;
             }
             table.stream_desc_vec[index].size = size;
             this->size = size;
             table.save(parser, stream_table_addr);
             parser.write(table.stream_desc_vec[index].addr, buffer.data(), size);
+            if(old_addr != -1) allocator.free(old_addr); //старые данные не нужны, их заменил buffer
             return;
         }
         throw runtime_error("поток MAIN не найден в файле");

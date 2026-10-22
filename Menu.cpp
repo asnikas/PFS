@@ -69,6 +69,7 @@ void Menu::dispatch(string command, istringstream& args){ //istringstream нел
     else if(command == "move") handle_move(args);
     else if(command == "copy") handle_copy(args);
     else if(command == "set_acl") handle_set_acl(args);
+    else if(command == "stats") handle_stats(args);
     else if(command == "exit") running = false;
     else cout << "неизвестная команда: " << command << endl;
 }
@@ -293,4 +294,8 @@ void Menu::handle_set_acl(istringstream& args){
     }
     fs.set_acl(uid, buffer, can_read, can_write);
 
+}
+
+void Menu::handle_stats(istringstream& args){
+    fs.stats();
 }

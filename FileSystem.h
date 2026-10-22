@@ -56,4 +56,6 @@ struct FileSystem{
     void set_acl(int uid, char name[32], bool can_read, bool can_write, bool can_traverse = false);
 
     void check_name(const std::string& name);
+
+    void stats();
 };
