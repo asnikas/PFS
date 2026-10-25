@@ -13,10 +13,16 @@ void Menu::run(){
     string input;
     while(running){
 
-        if(is_interactive) cout << "> ";
+        try{
+            if(is_interactive) cout << fs.user_name + ": " + fs.pwd() + "> ";
+        }
+        catch(...){
+            cout << "> ";
+        }
+
         if(!getline(cin, input)) { //getline возвращает поток, а поток в условии дает false, 
-            //если в нем есть флаг ошибки
-            break;
+                //если в нем есть флаг ошибки
+                break;
         }
 
         istringstream iss(input); //оборачиваем строку так, чтобы из нее можно было читать, как из cin, поток, который читает из готовой строки
@@ -70,6 +76,7 @@ void Menu::dispatch(string command, istringstream& args){ //istringstream нел
     else if(command == "copy") handle_copy(args);
     else if(command == "set_acl") handle_set_acl(args);
     else if(command == "stats") handle_stats(args);
+    else if(command == "pwd") handle_pwd(args);
     else if(command == "exit") running = false;
     else cout << "неизвестная команда: " << command << endl;
 }
@@ -124,7 +131,7 @@ void Menu::handle_cd(istringstream& args){
         return;
     }
 
-    if(path == ".." || path == "/"){
+    if(path == "/"){
         fs.cd(path, true);
     }
 
@@ -251,28 +258,28 @@ void Menu::handle_rename(istringstream& args){
 
 void Menu::handle_move(istringstream& args){
     string name;
-    int dest_addr;
+    string destination_path;
 
-    if(!(args >> name >> dest_addr)){ 
+    if(!(args >> name >> destination_path)){ 
         cout << "неправильные входные данные для move" << endl;
         return;
     }
     char buffer[32] = {}; 
     strncpy(buffer, name.c_str(), 31);
-    fs.move(buffer, dest_addr);
+    fs.move(buffer, destination_path);
 }
 
 void Menu::handle_copy(istringstream& args){
     string name;
-    int dest_addr;
+    string destination_path;
 
-    if(!(args >> name >> dest_addr)){ 
+    if(!(args >> name >> destination_path)){ 
         cout << "неправильные входные данные для copy" << endl;
         return;
     }
     char buffer[32] = {}; 
     strncpy(buffer, name.c_str(), 31);
-    fs.copy(buffer, dest_addr);
+    fs.copy(buffer, destination_path);
 }
 
 void Menu::handle_set_acl(istringstream& args){
@@ -298,4 +305,8 @@ void Menu::handle_set_acl(istringstream& args){
 
 void Menu::handle_stats(istringstream& args){
     fs.stats();
+}
+
+void Menu::handle_pwd(istringstream& args){
+    cout << fs.pwd() << endl;
 }

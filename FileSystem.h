@@ -16,12 +16,16 @@ struct FileSystem{
     Encryption encryption;
     Resolver resolver;
     bool mounted = false; //подключен ли образ?
+    std::vector<std::pair<int, std::string>> path_stack;
+    std::string user_name = "N/A";
 
     FileSystem(Parser& parser, Allocator& allocator, Superblock& superblock);
 
     void mkfs(int image_size, char admin_name[32]);
 
     void sync();
+
+    std::string pwd();
 
     bool mount();
 
@@ -49,9 +53,9 @@ struct FileSystem{
 
     void rename(char name[32], char new_name[32]);
 
-    void move(char name[32], int dest_addr);
+    void move(char name[32], std::string path);
 
-    void copy(char name[32], int dest_addr);
+    void copy(char name[32], std::string path);
 
     void set_acl(int uid, char name[32], bool can_read, bool can_write, bool can_traverse = false);
 

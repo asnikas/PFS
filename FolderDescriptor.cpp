@@ -326,6 +326,9 @@ void FolderDescriptor::move(Allocator& allocator, Parser& parser, char name[32],
         file_table.save(parser, file_table_addr);
         allocator.free(old_dest_ft_addr);
     }
+    else{
+        throw runtime_error("название " + string(name) + " не найдено в каталоге при операции move");
+    }
 }
 
 void FolderDescriptor::rename(Parser& parser, char name[32], char new_name[32]){

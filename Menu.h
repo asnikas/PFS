@@ -2,7 +2,7 @@
 #include <sstream>
 #include "FileSystem.h"
 
-//istringstream - берем обычную string и оборачиваем ее так, чтобы с ней можно было работать, как и с cin,
+//istringstream - берем обычную string и оборачиваем ее так, чтобы с ней можно было работать, как и с cin
 
 struct Menu{
     FileSystem& fs;
@@ -48,4 +48,6 @@ struct Menu{
     void handle_set_acl(std::istringstream& args);
 
     void handle_stats(std::istringstream& args);
+
+    void handle_pwd(std::istringstream& args);
 };

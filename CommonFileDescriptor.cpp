@@ -7,7 +7,8 @@
 
 using namespace std;
 
-void CommonFileDescriptor::init(int owner_id, int stream_table_addr, int stream_table_size, int acl_addr, int acl_size){
+void CommonFileDescriptor::init(int owner_id, int stream_table_addr, 
+    int stream_table_size, int acl_addr, int acl_size){
     created_d = time(nullptr);
     modified_d = created_d;
     this->owner_id = owner_id;

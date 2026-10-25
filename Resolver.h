@@ -1,8 +1,10 @@
 #pragma once
 #include <string>
+#include <vector>
+#include <utility>
 #include "Parser.h"
 
 struct Resolver{
-    int resolve(Parser& parser, std::string path, int current_address, char folder_name[32],
+    std::vector<std::pair<int, std::string>> resolve(Parser& parser, std::string path, int current_address, char folder_name[32],
         int uid);
 };

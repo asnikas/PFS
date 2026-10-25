@@ -8,8 +8,9 @@
 
 using namespace std;
 
-int Resolver::resolve(Parser& parser, string path, int current_address, char folder_name[32], int uid){
+std::vector<std::pair<int, std::string>> Resolver::resolve(Parser& parser, string path, int current_address, char folder_name[32], int uid){
     vector <string> addr_parts; //в векторе нельзя <char[32]>, т.к это не присваиваемый тип
+    std::vector<std::pair<int, std::string>> steps;
     string word;
     stringstream ss(path);
     while(getline(ss, word, '/')){
@@ -23,13 +24,11 @@ int Resolver::resolve(Parser& parser, string path, int current_address, char fol
         parser.read(current_address, reinterpret_cast<char*>(&type), sizeof(int));
         if(type != 3){
             throw runtime_error("пытаемся пройти сквозь файл в resolver");
-            return -1;
         }
         folder.load(parser, current_address);
 
         if(!folder.can_traverse(parser, uid)){
             throw runtime_error("пользователь с uid " + to_string(uid) + " не может проходить через каталог " + string(folder_name));
-            return -1;
         }
         table.load(parser, folder.file_table_addr);
 
@@ -39,10 +38,10 @@ int Resolver::resolve(Parser& parser, string path, int current_address, char fol
 
         if(index == -1){
             throw runtime_error("нет элемента " + addr_parts[i] + " в каталоге " + string(folder_name));
-            return -1;
         }
         current_address = table.table_node_vec[index].addr;
         memcpy(folder_name, table.table_node_vec[index].name, 32);
+        steps.push_back({current_address, folder_name});
     }
     parser.read(current_address, reinterpret_cast<char*>(&type), sizeof(int));
     if(type == 3){
@@ -51,5 +50,6 @@ int Resolver::resolve(Parser& parser, string path, int current_address, char fol
             throw runtime_error("целью адреса был каталог, в который данный пользователь зайти не мог");
         }
     }
-    return current_address;
+
+    return steps;
 }

@@ -26,6 +26,8 @@ void FileSystem::mkfs(int image_size, char admin_name[32]){ //создать ф�
         runtime_error("минимальный размер системы должен быть 4096 Б, Вы ввели " + 
             to_string(image_size) + " Б");
 
+    path_stack.clear();
+
     if(mounted){
         UsersTable users_table = UsersTable(superblock);
         users_table.load(parser, superblock.users_table);
@@ -45,6 +47,7 @@ void FileSystem::mkfs(int image_size, char admin_name[32]){ //создать ф�
 
     int users_table_addr = allocator.alloc(users_table.users_vec.size() * sizeof(User));
     users_table.save(parser, users_table_addr); //добавляем админа
+    user_name = "N/A";
 
     int root_acl_addr = allocator.alloc(sizeof(int) + 1 * sizeof(FolderAccessEntry));
     int root_ft_addr = allocator.alloc(sizeof(int));
@@ -74,6 +77,7 @@ void FileSystem::mkfs(int image_size, char admin_name[32]){ //создать ф�
     curr_folder = root_addr;
     curr_uid = -1;
     memcpy(curr_folder_name, "ROOT", 5); //5 т.к в конце надо поставить \0
+    path_stack.push_back({superblock.root_dir_addr, "/"});
     mounted = true;
 }
 
@@ -81,6 +85,18 @@ void FileSystem::sync(){ //обновляем alloc_free у суперблока
     if(!mounted) return;
     allocator.save(superblock);
     superblock.save(parser, 0);
+}
+
+string FileSystem::pwd(){
+    string addr;
+    if(path_stack.size() == 0) throw runtime_error("адресная строка пустая (pwd)");
+    if(path_stack.size() == 1){
+        return "/";
+    }
+    for(int i = 1; i < path_stack.size(); i++){
+        addr += ("/" + path_stack[i].second);
+    }
+    return addr;
 }
 
 bool FileSystem::mount(){
@@ -99,6 +115,9 @@ bool FileSystem::mount(){
     memcpy(curr_folder_name, "ROOT", 5);
     mounted = true;
 
+    path_stack.clear();
+    path_stack.push_back({curr_folder, "/"});
+
     return true;
 }
 
@@ -111,6 +130,10 @@ void FileSystem::login(char name[32]){
         curr_folder = superblock.root_dir_addr;
         memset(curr_folder_name, 0, 32); 
         memcpy(curr_folder_name, "ROOT", 5);
+
+        path_stack.clear();
+        path_stack.push_back({curr_folder, "/"});
+        user_name = string(name);
     }
     else throw runtime_error(string("пользователь с именем ") + name + " не найден");
 }
@@ -170,18 +193,31 @@ void FileSystem::register_user(char name[32]){
 void FileSystem::cd(string path, bool to_root){
     if(to_root){
         curr_folder = superblock.root_dir_addr;
+        memset(curr_folder_name, 0, 32);
         memcpy(curr_folder_name, "ROOT", 5);
+        path_stack = {{curr_folder, "/"}};
+        return;
+    }
+    if(path == ".."){
+        if(path_stack.size() == 1) throw runtime_error("пользователь уже находится в корне");
+        path_stack.pop_back();
+        curr_folder = path_stack.back().first;
+        memset(curr_folder_name, 0, 32);
+        strncpy(curr_folder_name, path_stack.back().second.c_str(), 31);
         return;
     }
     char temp_folder_name[32];
     memcpy(temp_folder_name, curr_folder_name, 32);
-    int addr = resolver.resolve(parser, path, curr_folder, temp_folder_name, curr_uid);
+    std::vector<std::pair<int, std::string>> steps = resolver.resolve(parser, path, curr_folder, temp_folder_name, curr_uid);
+    if(steps.empty()) throw runtime_error("команда " + path + " оставляет пользователя в текущем каталоге");
+    int addr = steps.back().first;
     if(addr != -1){
         int type;
         parser.read(addr, reinterpret_cast<char*>(&type), sizeof(int));
         if(type == 3) {
             curr_folder = addr;
             memcpy(curr_folder_name, temp_folder_name, 32);
+            path_stack.insert(path_stack.end(), steps.begin(), steps.end());
             return;
         }
         throw runtime_error("Попытались открыть файл вместо каталога в cd");
@@ -229,7 +265,6 @@ void FileSystem::create(char file_name[32], bool can_read, bool can_write){
             file.init(curr_uid, st_addr, 1, acl_addr, 1);
             file.save(parser, addr);
 
-        
             ft.add(file_name, addr);
             new_ft_addr = allocator.alloc(sizeof(int) + ft.table_node_vec.size() * sizeof(TableNode));
 
@@ -490,7 +525,17 @@ void FileSystem::rename(char name[32], char new_name[32]){
     fd.rename(parser, name, new_name);
 }
 
-void FileSystem::move(char name[32], int dest_addr){
+void FileSystem::move(char name[32], std::string path){
+    char buf[32] = {};
+    int dest_addr;
+    strncpy(buf, "ROOT", 31);
+    std::vector<std::pair<int, std::string>> steps = resolver.resolve(parser, path, 
+        superblock.root_dir_addr, buf, curr_uid);
+
+    if(steps.size() == 0) dest_addr = superblock.root_dir_addr;
+
+    else dest_addr = steps.back().first;
+
     FolderDescriptor fd;
     fd.load(parser, curr_folder);
     int type;
@@ -504,13 +549,24 @@ void FileSystem::move(char name[32], int dest_addr){
     fd.move(allocator, parser, name, dest_addr);
 }
 
-void FileSystem::copy(char name[32], int dest_addr){
+void FileSystem::copy(char name[32], std::string path){
+    char buf[32] = {};
+    int dest_addr;
+    strncpy(buf, "ROOT", 31);
+    std::vector<std::pair<int, std::string>> steps = resolver.resolve(parser, path, 
+        superblock.root_dir_addr, buf, curr_uid);
+
+    if(steps.size() == 0) dest_addr = superblock.root_dir_addr;
+
+    else dest_addr = steps.back().first;
     FolderDescriptor fd;
     fd.load(parser, curr_folder);
     int type;
     parser.read(dest_addr, reinterpret_cast<char*>(&type), sizeof(int));
     if(type != 3) throw runtime_error("Выбранный файл не является каталогом");
-    if(!fd.can_write(parser, curr_uid)) throw runtime_error(string
+    FolderDescriptor dest_folder;
+    dest_folder.load(parser, dest_addr);
+    if(!fd.can_write(parser, curr_uid) || !dest_folder.can_write(parser, curr_uid)) throw runtime_error(string
         ("текущий пользователь не может скопировать объект каталога ") + curr_folder_name);
     fd.copy(parser, allocator, name, dest_addr);
 }
