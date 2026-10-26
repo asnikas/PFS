@@ -50,4 +50,8 @@ struct Menu{
     void handle_stats(std::istringstream& args);
 
     void handle_pwd(std::istringstream& args);
+
+    void handle_import(std::istringstream& args);
+
+    void handle_export(std::istringstream& args);
 };

@@ -4,6 +4,8 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <fstream>
+#include <iomanip>
 
 using namespace std;
 
@@ -77,6 +79,8 @@ void Menu::dispatch(string command, istringstream& args){ //istringstream нел
     else if(command == "set_acl") handle_set_acl(args);
     else if(command == "stats") handle_stats(args);
     else if(command == "pwd") handle_pwd(args);
+    else if(command == "import") handle_import(args);
+    else if(command == "export") handle_export(args);
     else if(command == "exit") running = false;
     else cout << "неизвестная команда: " << command << endl;
 }
@@ -309,4 +313,65 @@ void Menu::handle_stats(istringstream& args){
 
 void Menu::handle_pwd(istringstream& args){
     cout << fs.pwd() << endl;
+}
+
+void Menu::handle_import(std::istringstream& args){
+    string path, name;
+    if(!(args >> std::quoted(path))){ //читает путь как единую строку с пробелами, пока он находится в кавычках
+        cout << "неправильный входные данные для import" << endl;
+        return;
+    }
+    if(!(args >> name)){
+        size_t pos = path.find_last_of("/\\"); // "\" - это служенбный символ в с++, поэтому для его обозначения
+        // надо писать "\\"
+        if(pos == std::string::npos) name = path;
+        else name = path.substr(pos + 1);
+    }
+    fstream import_file;
+    import_file.open(path, ios::in | ios::binary);
+
+    if(!import_file) throw runtime_error("не удалось открыть файл " + path);
+    import_file.seekg(0, std::ios::end);
+    int size = import_file.tellg();
+    if(size < 0) throw runtime_error("размер импортируемого файла меньше 0");
+    import_file.seekg(0, std::ios::beg);
+    std::vector<char>file_data(size);
+    import_file.read(file_data.data(), size);
+
+    if(!import_file) throw runtime_error("не удалось прочитать данные в import");
+
+    char buffer[32] = {}; 
+    strncpy(buffer, name.c_str(), 31);
+
+    fs.create(buffer, 1, 1);
+
+    try{
+        fs.write(buffer, file_data);
+    }
+    catch(...){
+        fs.remove(buffer);
+        throw;
+    }
+}
+
+void Menu::handle_export(std::istringstream& args){
+    string path, name;
+    if(!(args >> std::quoted(path) >> name)){
+        cout << "неправильный входные данные для export" << endl;
+        return;
+    }
+
+    char buffer[32] = {}; 
+    strncpy(buffer, name.c_str(), 31);
+
+    vector <char> file_data = fs.read(buffer);
+
+    fstream export_file;
+    export_file.open(path, ios::out | ios::binary);
+
+    if(!export_file) throw runtime_error("не удалось открыть файл " + path);
+
+    export_file.write(file_data.data(), file_data.size());
+
+    if(!export_file) throw runtime_error("не удалось записать файл"); //как работает !export_file
 }
