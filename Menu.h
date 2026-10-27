@@ -54,4 +54,8 @@ struct Menu{
     void handle_import(std::istringstream& args);
 
     void handle_export(std::istringstream& args);
+
+    void handle_logout(std::istringstream& args);
+
+    void handle_help(std::istringstream& args);
 };

@@ -25,6 +25,8 @@ struct FileSystem{
 
     void sync();
 
+    void logout();
+
     std::string pwd();
 
     bool mount();

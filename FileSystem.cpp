@@ -87,6 +87,18 @@ void FileSystem::sync(){ //обновляем alloc_free у суперблока
     superblock.save(parser, 0);
 }
 
+void FileSystem::logout(){
+    user_name = "N/A";
+    curr_uid = -1;
+
+    curr_folder = superblock.root_dir_addr;
+    memset(curr_folder_name, 0, 32); 
+    memcpy(curr_folder_name, "ROOT", 5);
+
+    path_stack.clear();
+    path_stack.push_back({curr_folder, "/"});
+}
+
 string FileSystem::pwd(){
     string addr;
     if(path_stack.size() == 0) throw runtime_error("адресная строка пустая (pwd)");

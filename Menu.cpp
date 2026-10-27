@@ -7,16 +7,30 @@
 #include <fstream>
 #include <iomanip>
 
+#ifdef _WIN32
+#ifndef NOMINMAX 
+#define NOMINMAX 
+#endif
+#include <windows.h>
+#endif
+
 using namespace std;
 
-Menu::Menu(FileSystem& fs, bool is_interactive) : fs(fs) {this->is_interactive = is_interactive;}
+Menu::Menu(FileSystem& fs, bool is_interactive) : fs(fs) {this->is_interactive = is_interactive;
+    #ifdef _WIN32
+    HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD mode = 0;
+    GetConsoleMode(h, &mode);
+    SetConsoleMode(h, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+    #endif
+}
 
 void Menu::run(){
     string input;
     while(running){
 
         try{
-            if(is_interactive) cout << fs.user_name + ": " + fs.pwd() + "> ";
+            if(is_interactive) cout << "\033[32m" << fs.user_name + ": " + fs.pwd() + "> " << "\033[0m";
         }
         catch(...){
             cout << "> ";
@@ -38,26 +52,29 @@ void Menu::run(){
             catch(const exception& e){ //передаем сюда тип данных runtime_error 
                 //(который содержит еще и текст сообщения), если параметр ф-ии не будет ссылкой, то текст 
                 //ошибки потеряется (e.what() вернет чет типа std::exception)
-                cout << "error: " << e.what() << endl;
+                if(is_interactive) cout << "\033[31m" << "error: " << e.what() << "\033[0m" << endl;
+                else cout << "error: " << e.what() << endl;
             }
             try{
                 fs.sync();
             }
             catch(const exception& e){
-                cout << "ошибка: " << e.what() << endl;
+                if(is_interactive) cout << "\033[31m" << "ошибка: " << e.what() << "\033[0m" << endl;
+                else cout << "ошибка: " << e.what() << endl;
             }
         }
     }
 }
 
 void Menu::dispatch(string command, istringstream& args){ //istringstream нельзя передавать по значению, только по ссылке или указателю
-    if(!fs.mounted && command != "mkfs" && command != "exit"){
-        cout << "образ не подключен, выполните mkfs" << endl;
+    if(!fs.mounted && command != "mkfs" && command != "exit" && command != "help"){
+        cout << "\033[31m" << "образ не подключен, выполните mkfs" << "\033[0m" << endl;
         return;
     }
     if(fs.curr_uid == -1){
-        if(command != "login" && command != "register" && command != "mkfs" && command != "exit"){
-            cout << "сначала выполните login" << endl;
+        if(command != "login" && command != "register" 
+            && command != "mkfs" && command != "exit" && command != "help"){
+            cout << "\033[31m" << "сначала выполните login" << "\033[0m" << endl;
             return;
         }
     }
@@ -81,6 +98,8 @@ void Menu::dispatch(string command, istringstream& args){ //istringstream нел
     else if(command == "pwd") handle_pwd(args);
     else if(command == "import") handle_import(args);
     else if(command == "export") handle_export(args);
+    else if(command == "logout") handle_logout(args);
+    else if(command == "help") handle_help(args);
     else if(command == "exit") running = false;
     else cout << "неизвестная команда: " << command << endl;
 }
@@ -374,4 +393,53 @@ void Menu::handle_export(std::istringstream& args){
     export_file.write(file_data.data(), file_data.size());
 
     if(!export_file) throw runtime_error("не удалось записать файл"); //как работает !export_file
+}
+
+void Menu::handle_logout(std::istringstream& args){
+    fs.logout();
+}
+
+void Menu::handle_help(std::istringstream& args){
+    cout << R"HELP(
+        mkfs <size> <admin>                   create image / создать образ
+        login <name>                          log in / войти
+        logout                                log out / выйти из пользователя
+        register <name>                       add user (admin) / добавить пользователя (админ)
+        cd <dir>                              change dir (.. up, / root) / сменить каталог (.. вверх, / корень)
+        pwd                                   print current path / показать текущий путь
+        ls                                    list directory / показать содержимое каталога
+        create <name> <r> <w>                 create file / создать файл
+        create_encrypted <name> <r> <w>       create encrypted file / создать зашифрованный файл
+        mkdir <name> <r> <w> <x>              create directory / создать каталог
+        read <name>                           print file / вывести файл
+        write <name> <text>                   overwrite file / записать в файл
+        get_info <name>                       file info / информация о файле
+        rename <name> <new_name>              rename / переименовать
+        remove <name>                         delete file or empty dir / удалить файл или пустой каталог
+        copy <name> <path>                    copy to dir / копировать в каталог
+        move <name> <path>                    move to dir / переместить в каталог
+        set_acl <uid> <name> <r> <w> [<x>]    set access rights / задать права доступа
+        import <path> [name]                  load host file / загрузить файл с диска
+        export <path> <name>                  save file to host / сохранить файл на диск
+        stats                                 image usage / занятость образа
+        help                                  this help / эта справка
+        exit                                  quit / выход
+
+        NOTES / ВАЖНО
+        Flags: 1 yes, 0 no; r read, w write, x traverse.
+          Флаги: 1 да, 0 нет; r чтение, w запись, x проход.
+        Names: letters, digits, . _ - (up to 31 chars).
+          Имена: буквы, цифры, . _ - (до 31 символа).
+        cd works from the current dir; copy/move <path> is a FULL path from root, e.g. docs/secret, or / for root.
+          cd идёт от текущего каталога; в copy/move <path> это ПОЛНЫЙ путь от корня, например docs/secret, или / для корня.
+        import/export <path> is a path on your real disk; if it has spaces put it in quotes and use / inside: "C:/My Files/a.jpg".
+          import/export <path> это путь на вашем диске; если в нём есть пробелы, возьмите его в кавычки и используйте / внутри: "C:/My Files/a.jpg".
+        import without <name> uses the file name from the path; export overwrites an existing host file.
+          import без <name> берёт имя файла из пути; export перезаписывает существующий файл на диске.
+        set_acl: files - only the owner; directories - only admin (use <x> for directories); <uid> is the user number (admin 0, then 1, 2, ... in order of register).
+          set_acl: для файлов только владелец, для каталогов только админ (<x> указывается для каталогов); <uid> это номер пользователя (админ 0, затем 1, 2, ... по порядку register).
+        Before login only login, register, mkfs, help, exit are available.
+          До login доступны только login, register, mkfs, help, exit.
+        )HELP" << endl;
+
 }
