@@ -1,0 +1,13 @@
+mkfs 20000 admin
+login admin
+mkdir folder 1 1 1
+cd folder
+create regular_file 1 1
+register bob
+login bob
+cd folder
+login admin
+set_acl bob folder 1 1 1
+login bob
+cd folder
+ls

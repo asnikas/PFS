@@ -26,8 +26,6 @@ void FileSystem::mkfs(int image_size, char admin_name[32]){ //создать ф�
         runtime_error("минимальный размер системы должен быть 4096 Б, Вы ввели " + 
             to_string(image_size) + " Б");
 
-    path_stack.clear();
-
     if(mounted){
         UsersTable users_table = UsersTable(superblock);
         users_table.load(parser, superblock.users_table);
@@ -77,6 +75,7 @@ void FileSystem::mkfs(int image_size, char admin_name[32]){ //создать ф�
     curr_folder = root_addr;
     curr_uid = -1;
     memcpy(curr_folder_name, "ROOT", 5); //5 т.к в конце надо поставить \0
+    path_stack.clear();
     path_stack.push_back({superblock.root_dir_addr, "/"});
     mounted = true;
 }
@@ -198,7 +197,7 @@ void FileSystem::register_user(char name[32]){
         if(old_acl_addr != -1) allocator.free(old_acl_addr);
     }
     else{
-        throw runtime_error(string("В системе уже есть пользователь с именем") + name);
+        throw runtime_error(string("В системе уже есть пользователь с именем ") + name);
     }
 }
 
@@ -512,8 +511,11 @@ void FileSystem::get_info(char name[32]){
             enfd.load(parser, ft.table_node_vec[index].addr);
             enfd.get_info(parser);
         }
-        else{
-            throw runtime_error("у каталога нет метода get_info()");
+        else if(type == 3){
+            FolderDescriptor fd;
+            fd.load(parser, ft.table_node_vec[index].addr);
+            fd.get_info(parser);
+
         }
         return;
     }
@@ -583,12 +585,15 @@ void FileSystem::copy(char name[32], std::string path){
     fd.copy(parser, allocator, name, dest_addr);
 }
 
-void FileSystem::set_acl(int uid, char name[32], bool can_read, bool can_write, bool can_traverse){
+void FileSystem::set_acl(char user_name[32], char name[32], bool can_read, bool can_write, bool can_traverse){
 
     UsersTable users_table = UsersTable(superblock);
     users_table.load(parser, superblock.users_table);
-    if(users_table.search(uid) == -1){
-        throw runtime_error("Для set_acl пользователя с uid " + to_string(uid) +  " нет в системе");
+
+    int uid = users_table.search_uid_by_name(user_name);
+
+    if(uid == -1){
+        throw runtime_error(string("Для set_acl пользователя с именем ") + user_name + " нет в системе");
     }
 
     FolderDescriptor fd;
@@ -736,4 +741,11 @@ void FileSystem::stats(){
     cout << "Percent of capacity used: " << 
     ((sizeof(Superblock) + sum_bytes_taken + free_blocks_count * 9 +
     ((double)taken_blocks_count * 9))/(double)allocator.image_size)*100 << " %" << endl;
+
+    UsersTable users_table = UsersTable(superblock);
+    users_table.load(parser, superblock.users_table);
+    cout << "Users table" << endl;
+    for(auto el:users_table.users_vec){
+        cout << "Username: " << el.name << " Id: " << el.id << endl;
+    }
 }

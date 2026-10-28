@@ -29,12 +29,12 @@ int main(){
 
     bool fs_mount = filesystem.mount();
 
+    Menu menu(filesystem, is_interactive);
+
     if(is_interactive){
         if(fs_mount) cout << "образ подключен, выполните login" << endl;
         else cout << "образ не найден, выполните mkfs" << endl;
     }
-
-    Menu menu(filesystem, is_interactive);
 
     menu.run();
 }

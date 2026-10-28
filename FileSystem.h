@@ -59,7 +59,7 @@ struct FileSystem{
 
     void copy(char name[32], std::string path);
 
-    void set_acl(int uid, char name[32], bool can_read, bool can_write, bool can_traverse = false);
+    void set_acl(char user_name[32], char name[32], bool can_read, bool can_write, bool can_traverse = false);
 
     void check_name(const std::string& name);
 

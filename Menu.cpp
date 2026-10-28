@@ -8,10 +8,10 @@
 #include <iomanip>
 
 #ifdef _WIN32
+#include <windows.h>
 #ifndef NOMINMAX 
 #define NOMINMAX 
 #endif
-#include <windows.h>
 #endif
 
 using namespace std;
@@ -22,6 +22,7 @@ Menu::Menu(FileSystem& fs, bool is_interactive) : fs(fs) {this->is_interactive =
     DWORD mode = 0;
     GetConsoleMode(h, &mode);
     SetConsoleMode(h, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+    SetConsoleOutputCP(CP_UTF8);
     #endif
 }
 
@@ -68,13 +69,15 @@ void Menu::run(){
 
 void Menu::dispatch(string command, istringstream& args){ //istringstream нельзя передавать по значению, только по ссылке или указателю
     if(!fs.mounted && command != "mkfs" && command != "exit" && command != "help"){
-        cout << "\033[31m" << "образ не подключен, выполните mkfs" << "\033[0m" << endl;
+        if(is_interactive) cout << "\033[31m" << "образ не подключен, выполните mkfs" << "\033[0m" << endl;
+        else cout << "образ не подключен, выполните mkfs" << endl;
         return;
     }
     if(fs.curr_uid == -1){
         if(command != "login" && command != "register" 
             && command != "mkfs" && command != "exit" && command != "help"){
-            cout << "\033[31m" << "сначала выполните login" << "\033[0m" << endl;
+            if(is_interactive) cout << "\033[31m" << "сначала выполните login" << "\033[0m" << endl;
+            else cout << "сначала выполните login" << endl;
             return;
         }
     }
@@ -306,23 +309,23 @@ void Menu::handle_copy(istringstream& args){
 }
 
 void Menu::handle_set_acl(istringstream& args){
-    int uid;
-    string name;
+    string user_name, file_name;
     bool can_read, can_write, can_traverse;
 
-    if(!(args >> uid >> name >> can_read >> can_write)){ 
+    if(!(args >> user_name >> file_name >> can_read >> can_write)){ 
         cout << "неправильные входные данные для set_acl" << endl;
         return;
     }
 
-    char buffer[32] = {}; 
-    strncpy(buffer, name.c_str(), 31);
+    char buffer[32] = {}, buffer2[32] = {}; 
+    strncpy(buffer, user_name.c_str(), 31);
+    strncpy(buffer2, file_name.c_str(), 31);
 
     if(args >> can_traverse){
-        fs.set_acl(uid, buffer, can_read, can_write, can_traverse);
+        fs.set_acl(buffer, buffer2, can_read, can_write, can_traverse);
         return;
     }
-    fs.set_acl(uid, buffer, can_read, can_write);
+    fs.set_acl(buffer, buffer2, can_read, can_write);
 
 }
 
@@ -417,10 +420,10 @@ void Menu::handle_help(std::istringstream& args){
         rename <name> <new_name>              rename / переименовать
         remove <name>                         delete file or empty dir / удалить файл или пустой каталог
         copy <name> <path>                    copy to dir / копировать в каталог
-        move <name> <path>                    move to dir / переместить в каталог
-        set_acl <uid> <name> <r> <w> [<x>]    set access rights / задать права доступа
-        import <path> [name]                  load host file / загрузить файл с диска
-        export <path> <name>                  save file to host / сохранить файл на диск
+        move <name> <path>                               move to dir / переместить в каталог
+        set_acl <user_name> <file_name> <r> <w> [<x>]    set access rights / задать права доступа
+        import <path> [name]                             load host file / загрузить файл с диска
+        export <path> <name>                             save file to host / сохранить файл на диск
         stats                                 image usage / занятость образа
         help                                  this help / эта справка
         exit                                  quit / выход
@@ -436,7 +439,7 @@ void Menu::handle_help(std::istringstream& args){
           import/export <path> это путь на вашем диске; если в нём есть пробелы, возьмите его в кавычки и используйте / внутри: "C:/My Files/a.jpg".
         import without <name> uses the file name from the path; export overwrites an existing host file.
           import без <name> берёт имя файла из пути; export перезаписывает существующий файл на диске.
-        set_acl: files - only the owner; directories - only admin (use <x> for directories); <uid> is the user number (admin 0, then 1, 2, ... in order of register).
+        set_acl: files - only the owner; directories - only admin (use <x> for directories).
           set_acl: для файлов только владелец, для каталогов только админ (<x> указывается для каталогов); <uid> это номер пользователя (админ 0, затем 1, 2, ... по порядку register).
         Before login only login, register, mkfs, help, exit are available.
           До login доступны только login, register, mkfs, help, exit.

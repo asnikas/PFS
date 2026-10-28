@@ -61,10 +61,10 @@ void FolderDescriptor::show(Parser& parser){
     FileTable file_table;
     file_table.load(parser, file_table_addr);
 
-    cout << "Текущий размер: " << file_table.table_node_vec.size() << endl;
+    cout << "Кол-во элементов: " << file_table.table_node_vec.size() << endl;
 
     for(auto el:file_table.table_node_vec){
-        cout << el.name << ' ' << el.addr << endl;
+        cout << "Название: " << el.name << " Адрес: " << el.addr << endl;
     }
 }
 
@@ -427,6 +427,19 @@ bool FolderDescriptor::is_inside(Parser& parser, int root_addr, int folder_addr)
         if(is_inside(parser, el.addr, folder_addr)) return true;
     }
     return false;
+}
+
+void FolderDescriptor::get_info(Parser& parser){
+    cout << "ACL size: " << acl_size <<endl;
+    cout << "ACL: \n";
+    FolderACList acl;
+    acl.load(parser, acl_addr);
+    for(auto el:acl.ACList){
+        cout << "User id: " << el.uid << 
+        " Can read: " << el.can_read << 
+        " Can write: " << el.can_write <<
+        " Can traverse: " << el.can_traverse << endl;
+    }
 }
 
 void FolderDescriptor::save(Parser& parser, int addr){

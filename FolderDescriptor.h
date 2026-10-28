@@ -32,6 +32,8 @@ struct FolderDescriptor : Descriptor{
 
     bool is_inside(Parser& parser, int root_addr, int folder_addr);
 
+    void get_info(Parser& parser);
+
     void save(Parser& parser, int addr);
     void load(Parser& parser, int addr);
 };

@@ -4,6 +4,7 @@
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
+#include <iomanip>
 
 using namespace std;
 
@@ -54,8 +55,8 @@ void CommonFileDescriptor::get_info(Parser& parser){
         " Can read: " << el.can_read << 
         " Can write: " << el.can_write << endl;
     }
-    cout << "Created date: " << created_d << endl;
-    cout << "Last time modified: " << modified_d << endl;
+    cout << "Created date: " << put_time(localtime(&created_d), "%d-%m-%Y %H:%M:%S") << endl;
+    cout << "Last time modified: " << put_time(localtime(&modified_d), "%d-%m-%Y %H:%M:%S") << endl;
 }
 
 vector <char> CommonFileDescriptor::read(Parser& parser, int uid){
