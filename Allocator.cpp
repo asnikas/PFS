@@ -33,31 +33,31 @@ int Allocator::alloc(int size){
         next_free += (HEADER_SIZE + size + FOOTER_SIZE);
         return result;
     }
-    throw runtime_error("образ закончился, текущий размер - " + to_string(image_size));
+    throw runtime_error("image is full, current size - " + to_string(image_size));
 }
 
 void Allocator::free(int address){
     if(address - HEADER_SIZE < START_TRAVERSE || address >= next_free) throw
-    runtime_error("адрес не находится в пределах [START_TRAVERSE; next_free)");
+    runtime_error("address is outside the heap range [START_TRAVERSE; next_free)");
     bool flag = 1;
     for(int i = START_TRAVERSE; i + HEADER_SIZE <= address; ){
         Header temp_h = read_header(i);
         if(temp_h.size < MIN_PAYLOAD) throw
-        runtime_error("куча повреждена при traverse во free");
+        runtime_error("heap is corrupted (found while traversing in free)");
         if(i + HEADER_SIZE == address){
             flag = 0;
             break;
         }
         i += (HEADER_SIZE + temp_h.size + FOOTER_SIZE);
     }
-    if(flag) throw runtime_error("адрес данных во free находится на стыке структур");
+    if(flag) throw runtime_error("data address in free points inside a block header or footer");
     Header h;
     h = read_header(address - HEADER_SIZE);
     Footer temp_f;
     temp_f = footer_reader(address + h.size);
     if(h.size != temp_f.size || h.free ||
         address + h.size + FOOTER_SIZE > next_free || h.size < MIN_PAYLOAD) throw
-        runtime_error("нельзя очистить выбранный блок");
+        runtime_error("the selected block cannot be freed");
 
     if(address - HEADER_SIZE != START_TRAVERSE){
         Footer f;

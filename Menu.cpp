@@ -60,8 +60,8 @@ void Menu::run(){
                 fs.sync();
             }
             catch(const exception& e){
-                if(is_interactive) cout << "\033[31m" << "ошибка: " << e.what() << "\033[0m" << endl;
-                else cout << "ошибка: " << e.what() << endl;
+                if(is_interactive) cout << "\033[31m" << "error: " << e.what() << "\033[0m" << endl;
+                else cout << "error: " << e.what() << endl;
             }
         }
     }
@@ -69,15 +69,15 @@ void Menu::run(){
 
 void Menu::dispatch(string command, istringstream& args){ //istringstream нельзя передавать по значению, только по ссылке или указателю
     if(!fs.mounted && command != "mkfs" && command != "exit" && command != "help"){
-        if(is_interactive) cout << "\033[31m" << "образ не подключен, выполните mkfs" << "\033[0m" << endl;
-        else cout << "образ не подключен, выполните mkfs" << endl;
+        if(is_interactive) cout << "\033[31m" << "image is not mounted, run mkfs" << "\033[0m" << endl;
+        else cout << "image is not mounted, run mkfs" << endl;
         return;
     }
     if(fs.curr_uid == -1){
         if(command != "login" && command != "register" 
             && command != "mkfs" && command != "exit" && command != "help"){
-            if(is_interactive) cout << "\033[31m" << "сначала выполните login" << "\033[0m" << endl;
-            else cout << "сначала выполните login" << endl;
+            if(is_interactive) cout << "\033[31m" << "log in first (login)" << "\033[0m" << endl;
+            else cout << "log in first (login)" << endl;
             return;
         }
     }
@@ -104,7 +104,7 @@ void Menu::dispatch(string command, istringstream& args){ //istringstream нел
     else if(command == "logout") handle_logout(args);
     else if(command == "help") handle_help(args);
     else if(command == "exit") running = false;
-    else cout << "неизвестная команда: " << command << endl;
+    else cout << "unknown command: " << command << endl;
 }
 
 void Menu::handle_mkfs(istringstream& args){
@@ -112,7 +112,7 @@ void Menu::handle_mkfs(istringstream& args){
     string admin_name;
 
     if(!(args >> image_size >> admin_name)){ //пытаемся вычитать из остатка строки сначала число, потом слово
-        cout << "неправильные входные данные для mkfs" << endl;
+        cout << "invalid arguments for mkfs" << endl;
         return;
     }
 
@@ -126,7 +126,7 @@ void Menu::handle_mkfs(istringstream& args){
 void Menu::handle_login(istringstream& args){
     string name;
     if(!(args >> name)){ 
-        cout << "неправильные входные данные для login" << endl;
+        cout << "invalid arguments for login" << endl;
         return;
     }
 
@@ -140,7 +140,7 @@ void Menu::handle_login(istringstream& args){
 void Menu::handle_register(istringstream& args){
     string name;
     if(!(args >> name)){ 
-        cout << "неправильные входные данные для register_user" << endl;
+        cout << "invalid arguments for register_user" << endl;
         return;
     }
     char buffer[32] = {}; //?
@@ -153,7 +153,7 @@ void Menu::handle_register(istringstream& args){
 void Menu::handle_cd(istringstream& args){
     string path;
     if(!(args >> path)){ 
-        cout << "неправильные входные данные для cd" << endl;
+        cout << "invalid arguments for cd" << endl;
         return;
     }
 
@@ -172,7 +172,7 @@ void Menu::handle_create(istringstream& args){
     string path;
     bool can_read, can_write;
     if(!(args >> path >> can_read >> can_write)){ 
-        cout << "неправильные входные данные для create" << endl;
+        cout << "invalid arguments for create" << endl;
         return;
     }
     char buffer[32] = {}; 
@@ -186,7 +186,7 @@ void Menu::handle_create_encrypted(istringstream& args){
     string path;
     bool can_read, can_write;
     if(!(args >> path >> can_read >> can_write)){ 
-        cout << "неправильные входные данные для create_encrypted" << endl;
+        cout << "invalid arguments for create_encrypted" << endl;
         return;
     }
     char buffer[32] = {}; 
@@ -200,7 +200,7 @@ void Menu::handle_mkdir(istringstream& args){
     string path;
     bool can_read, can_write, can_traverse;
     if(!(args >> path >> can_read >> can_write >> can_traverse)){ 
-        cout << "неправильные входные данные для mkdir" << endl;
+        cout << "invalid arguments for mkdir" << endl;
         return;
     }
     char buffer[32] = {}; 
@@ -213,7 +213,7 @@ void Menu::handle_mkdir(istringstream& args){
 void Menu::handle_read(istringstream& args){
     string name;
     if(!(args >> name)){ 
-        throw runtime_error("неправильные входные данные для read");
+        throw runtime_error("invalid arguments for read");
     }
     char buffer[32] = {}; 
     strncpy(buffer, name.c_str(), 31);
@@ -229,7 +229,7 @@ void Menu::handle_read(istringstream& args){
 void Menu::handle_write(istringstream& args){
     string name;
     if(!(args >> name)){ 
-        cout << "неправильные входные данные для write" << endl;
+        cout << "invalid arguments for write" << endl;
         return;
     }
 
@@ -248,7 +248,7 @@ void Menu::handle_write(istringstream& args){
 void Menu::handle_get_info(istringstream& args){
     string name;
     if(!(args >> name)){ 
-        cout << "неправильные входные данные для get_info" << endl;
+        cout << "invalid arguments for get_info" << endl;
         return;
     }
     char buffer[32] = {}; 
@@ -259,7 +259,7 @@ void Menu::handle_get_info(istringstream& args){
 void Menu::handle_remove(istringstream& args){
     string name;
     if(!(args >> name)){ 
-        cout << "неправильные входные данные для remove" << endl;
+        cout << "invalid arguments for remove" << endl;
         return;
     }
     char buffer[32] = {}; 
@@ -270,7 +270,7 @@ void Menu::handle_remove(istringstream& args){
 void Menu::handle_rename(istringstream& args){
     string name, new_name;
     if(!(args >> name >> new_name)){ 
-        cout << "неправильные входные данные для rename" << endl;
+        cout << "invalid arguments for rename" << endl;
         return;
     }
 
@@ -287,7 +287,7 @@ void Menu::handle_move(istringstream& args){
     string destination_path;
 
     if(!(args >> name >> destination_path)){ 
-        cout << "неправильные входные данные для move" << endl;
+        cout << "invalid arguments for move" << endl;
         return;
     }
     char buffer[32] = {}; 
@@ -300,7 +300,7 @@ void Menu::handle_copy(istringstream& args){
     string destination_path;
 
     if(!(args >> name >> destination_path)){ 
-        cout << "неправильные входные данные для copy" << endl;
+        cout << "invalid arguments for copy" << endl;
         return;
     }
     char buffer[32] = {}; 
@@ -313,7 +313,7 @@ void Menu::handle_set_acl(istringstream& args){
     bool can_read, can_write, can_traverse;
 
     if(!(args >> user_name >> file_name >> can_read >> can_write)){ 
-        cout << "неправильные входные данные для set_acl" << endl;
+        cout << "invalid arguments for set_acl" << endl;
         return;
     }
 
@@ -340,7 +340,7 @@ void Menu::handle_pwd(istringstream& args){
 void Menu::handle_import(std::istringstream& args){
     string path, name;
     if(!(args >> std::quoted(path))){ //читает путь как единую строку с пробелами, пока он находится в кавычках
-        cout << "неправильный входные данные для import" << endl;
+        cout << "invalid arguments for import" << endl;
         return;
     }
     if(!(args >> name)){
@@ -352,15 +352,15 @@ void Menu::handle_import(std::istringstream& args){
     fstream import_file;
     import_file.open(path, ios::in | ios::binary);
 
-    if(!import_file) throw runtime_error("не удалось открыть файл " + path);
+    if(!import_file) throw runtime_error("could not open file " + path);
     import_file.seekg(0, std::ios::end);
     int size = import_file.tellg();
-    if(size < 0) throw runtime_error("размер импортируемого файла меньше 0");
+    if(size < 0) throw runtime_error("size of the imported file is less than 0");
     import_file.seekg(0, std::ios::beg);
     std::vector<char>file_data(size);
     import_file.read(file_data.data(), size);
 
-    if(!import_file) throw runtime_error("не удалось прочитать данные в import");
+    if(!import_file) throw runtime_error("could not read data in import");
 
     char buffer[32] = {}; 
     strncpy(buffer, name.c_str(), 31);
@@ -379,7 +379,7 @@ void Menu::handle_import(std::istringstream& args){
 void Menu::handle_export(std::istringstream& args){
     string path, name;
     if(!(args >> std::quoted(path) >> name)){
-        cout << "неправильный входные данные для export" << endl;
+        cout << "invalid arguments for export" << endl;
         return;
     }
 
@@ -391,11 +391,11 @@ void Menu::handle_export(std::istringstream& args){
     fstream export_file;
     export_file.open(path, ios::out | ios::binary);
 
-    if(!export_file) throw runtime_error("не удалось открыть файл " + path);
+    if(!export_file) throw runtime_error("could not open file " + path);
 
     export_file.write(file_data.data(), file_data.size());
 
-    if(!export_file) throw runtime_error("не удалось записать файл"); //как работает !export_file
+    if(!export_file) throw runtime_error("could not write the file"); //как работает !export_file
 }
 
 void Menu::handle_logout(std::istringstream& args){

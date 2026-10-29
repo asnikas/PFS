@@ -1,0 +1,4 @@
+contains: /folder1/folder2
+contains: this is file1
+contains: this is file0
+not_contains: error

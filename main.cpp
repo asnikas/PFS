@@ -32,8 +32,8 @@ int main(){
     Menu menu(filesystem, is_interactive);
 
     if(is_interactive){
-        if(fs_mount) cout << "образ подключен, выполните login" << endl;
-        else cout << "образ не найден, выполните mkfs" << endl;
+        if(fs_mount) cout << "image mounted, run login" << endl;
+        else cout << "image not found, run mkfs" << endl;
     }
 
     menu.run();

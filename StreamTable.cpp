@@ -58,7 +58,7 @@ void StreamTable::load(Parser& parser, int addr){
     int size;
     parser.read(addr, reinterpret_cast<char*>(&size), sizeof(size));
     if(size < 0 || size > 1000){
-        cout << "невалидный размер size для StreamTable при чтении из Parser\n";
+        cout << "invalid size while loading StreamTable from Parser\n";
         return;
     }
     stream_desc_vec.resize(size); //выделяем место для вектора

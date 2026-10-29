@@ -23,12 +23,12 @@ std::vector<std::pair<int, std::string>> Resolver::resolve(Parser& parser, strin
     for(int i = 0; i < addr_parts.size(); i++){
         parser.read(current_address, reinterpret_cast<char*>(&type), sizeof(int));
         if(type != 3){
-            throw runtime_error("пытаемся пройти сквозь файл в resolver");
+            throw runtime_error("trying to pass through a file in resolver");
         }
         folder.load(parser, current_address);
 
         if(!folder.can_traverse(parser, uid)){
-            throw runtime_error("пользователь с uid " + to_string(uid) + " не может проходить через каталог " + string(folder_name));
+            throw runtime_error("user with uid " + to_string(uid) + " cannot traverse directory " + string(folder_name));
         }
         table.load(parser, folder.file_table_addr);
 
@@ -37,7 +37,7 @@ std::vector<std::pair<int, std::string>> Resolver::resolve(Parser& parser, strin
         int index = table.search(buffer);
 
         if(index == -1){
-            throw runtime_error("нет элемента " + addr_parts[i] + " в каталоге " + string(folder_name));
+            throw runtime_error("no item " + addr_parts[i] + " in directory " + string(folder_name));
         }
         current_address = table.table_node_vec[index].addr;
         memcpy(folder_name, table.table_node_vec[index].name, 32);
@@ -47,7 +47,7 @@ std::vector<std::pair<int, std::string>> Resolver::resolve(Parser& parser, strin
     if(type == 3){
         folder.load(parser, current_address);
         if(!folder.can_traverse(parser, uid)){
-            throw runtime_error("целью адреса был каталог, в который данный пользователь зайти не мог");
+            throw runtime_error("the target of the path is a directory the user cannot enter");
         }
     }
 

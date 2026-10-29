@@ -44,7 +44,7 @@ void FolderACList::load(Parser& parser, int addr){
     int size;
     parser.read(addr, reinterpret_cast<char*>(&size), sizeof(size));
     if(size < 0 || size > 1000){
-        cout << "невалидный размер size для ACList при чтении из FolderACList\n";
+        cout << "invalid ACList size while loading FolderACList\n";
         return;
     }
     ACList.resize(size); //выделяем место для вектора

@@ -23,14 +23,14 @@ FileSystem::FileSystem(Parser& parser, Allocator& allocator,
 void FileSystem::mkfs(int image_size, char admin_name[32]){ //создать фс
 
     if(image_size < MIN_IMAGE_SIZE) throw 
-        runtime_error("минимальный размер системы должен быть 4096 Б, Вы ввели " + 
-            to_string(image_size) + " Б");
+        runtime_error("minimum image size is 4096 bytes, you entered " + 
+            to_string(image_size) + " bytes");
 
     if(mounted){
         UsersTable users_table = UsersTable(superblock);
         users_table.load(parser, superblock.users_table);
         if(curr_uid != users_table.users_vec[0].id) throw 
-        runtime_error("Выполнить mkfs для mounted системы может только админ");
+        runtime_error("only the admin can run mkfs on a mounted image");
     }
 
     check_name(admin_name);
@@ -52,7 +52,7 @@ void FileSystem::mkfs(int image_size, char admin_name[32]){ //создать ф�
     int root_addr = allocator.alloc(sizeof(FolderDescriptor)); //адрес корневого каталога
 
     if(users_table_addr == -1 || root_acl_addr == -1 || root_ft_addr == -1 || root_addr == -1){
-        cout << "alloc вернул -1 при mkfs в FileSystem" << endl;
+        cout << "alloc returned -1 during mkfs" << endl;
         return;
     }
 
@@ -100,7 +100,7 @@ void FileSystem::logout(){
 
 string FileSystem::pwd(){
     string addr;
-    if(path_stack.size() == 0) throw runtime_error("адресная строка пустая (pwd)");
+    if(path_stack.size() == 0) throw runtime_error("path stack is empty (pwd)");
     if(path_stack.size() == 1){
         return "/";
     }
@@ -146,14 +146,14 @@ void FileSystem::login(char name[32]){
         path_stack.push_back({curr_folder, "/"});
         user_name = string(name);
     }
-    else throw runtime_error(string("пользователь с именем ") + name + " не найден");
+    else throw runtime_error(string("user ") + name + " not found");
 }
 
 void FileSystem::register_user(char name[32]){
     UsersTable us_table(superblock);
     us_table.load(parser, superblock.users_table);
     if(curr_uid != us_table.users_vec[0].id) throw 
-    runtime_error("Только админ может регистрировать новых пользователей");
+    runtime_error("only the admin can register new users");
     check_name(name);
     if(us_table.search_uid_by_name(name) == -1){
         //до любых изменений: UsersTable::add меняет superblock.next_id, UsersTable::save - superblock.users_table,
@@ -197,7 +197,7 @@ void FileSystem::register_user(char name[32]){
         if(old_acl_addr != -1) allocator.free(old_acl_addr);
     }
     else{
-        throw runtime_error(string("В системе уже есть пользователь с именем ") + name);
+        throw runtime_error(string("user already exists: ") + name);
     }
 }
 
@@ -210,7 +210,7 @@ void FileSystem::cd(string path, bool to_root){
         return;
     }
     if(path == ".."){
-        if(path_stack.size() == 1) throw runtime_error("пользователь уже находится в корне");
+        if(path_stack.size() == 1) throw runtime_error("already in the root directory");
         path_stack.pop_back();
         curr_folder = path_stack.back().first;
         memset(curr_folder_name, 0, 32);
@@ -220,7 +220,7 @@ void FileSystem::cd(string path, bool to_root){
     char temp_folder_name[32];
     memcpy(temp_folder_name, curr_folder_name, 32);
     std::vector<std::pair<int, std::string>> steps = resolver.resolve(parser, path, curr_folder, temp_folder_name, curr_uid);
-    if(steps.empty()) throw runtime_error("команда " + path + " оставляет пользователя в текущем каталоге");
+    if(steps.empty()) throw runtime_error("path " + path + " leaves the user in the current directory");
     int addr = steps.back().first;
     if(addr != -1){
         int type;
@@ -231,7 +231,7 @@ void FileSystem::cd(string path, bool to_root){
             path_stack.insert(path_stack.end(), steps.begin(), steps.end());
             return;
         }
-        throw runtime_error("Попытались открыть файл вместо каталога в cd");
+        throw runtime_error("tried to cd into a file, not a directory");
     }
 }
 
@@ -239,7 +239,7 @@ void FileSystem::ls(){
     FolderDescriptor fd;
     fd.load(parser, curr_folder);
     if(fd.can_read(parser, curr_uid)) fd.show(parser);
-    else throw runtime_error(string("текущий пользователь не может прочитать каталог ") + 
+    else throw runtime_error(string("current user cannot read directory ") + 
     curr_folder_name);
 }
 
@@ -250,7 +250,7 @@ void FileSystem::create(char file_name[32], bool can_read, bool can_write){
     FolderDescriptor folder;
     folder.load(parser, curr_folder);
     if(!folder.can_write(parser, curr_uid)) throw runtime_error(string
-        ("текущий пользователь не может писать в каталог ") + curr_folder_name);
+        ("current user cannot write to directory ") + curr_folder_name);
     ft.load(parser, folder.file_table_addr);
     if(ft.search(file_name) == -1){
 
@@ -296,7 +296,7 @@ void FileSystem::create(char file_name[32], bool can_read, bool can_write){
         if(old_ft_addr != -1) allocator.free(old_ft_addr);
         return;
     }
-    throw runtime_error("при создании обычного файла выяснилось, что файл с таким именем уже есть");
+    throw runtime_error("while creating a regular file it turned out that a file with this name already exists");
 }
 
 void FileSystem::create_encrypted(char file_name[32], bool can_read, bool can_write){
@@ -306,7 +306,7 @@ void FileSystem::create_encrypted(char file_name[32], bool can_read, bool can_wr
     FolderDescriptor folder;
     folder.load(parser, curr_folder);
     if(!folder.can_write(parser, curr_uid)) throw runtime_error(string
-        ("текущий пользователь не может писать в каталог ") + curr_folder_name);
+        ("current user cannot write to directory ") + curr_folder_name);
     ft.load(parser, folder.file_table_addr);
     if(ft.search(file_name) == -1){
 
@@ -364,7 +364,7 @@ void FileSystem::create_encrypted(char file_name[32], bool can_read, bool can_wr
         return;
     }
 
-    throw runtime_error("при создании зашифрованного файла выяснилось, что файл с таким именем уже есть");
+    throw runtime_error("while creating an encrypted file it turned out that a file with this name already exists");
 }
 
 void FileSystem::mkdir(char folder_name[32], bool can_read, bool can_write, bool can_traverse){
@@ -373,7 +373,7 @@ void FileSystem::mkdir(char folder_name[32], bool can_read, bool can_write, bool
     FolderDescriptor initial_folder;
     initial_folder.load(parser, curr_folder);
     if(!initial_folder.can_write(parser, curr_uid)) throw runtime_error(string
-        ("текущий пользователь не может писать в каталог ") + curr_folder_name);
+        ("current user cannot write to directory ") + curr_folder_name);
     ft.load(parser, initial_folder.file_table_addr);
     if(ft.search(folder_name) == -1){
 
@@ -416,7 +416,7 @@ void FileSystem::mkdir(char folder_name[32], bool can_read, bool can_write, bool
         return;
 
     }
-    throw runtime_error("при создании подкаталога выяснилось, что каталог с таким именем уже есть");
+    throw runtime_error("while creating a subdirectory it turned out that a directory with this name already exists");
 }
 
 vector <char> FileSystem::read(char name[32]){
@@ -440,17 +440,17 @@ vector <char> FileSystem::read(char name[32]){
             ut.load(parser, superblock.users_table);
             uint8_t usr_key[32];
             int usr_key_index = ut.search(curr_uid);
-            if(usr_key_index == -1) throw runtime_error(string("не найден пользователь при чтении зашифрованного файла") + name);
+            if(usr_key_index == -1) throw runtime_error(string("user not found while reading encrypted file ") + name);
             memcpy(usr_key, ut.users_vec[usr_key_index].key, 32);
             
             return enfd.read(parser, encryption, curr_uid, vector(usr_key, usr_key + 32 * sizeof(uint8_t)));
         }
 
         else{
-            throw runtime_error("попытались открыть каталог вместо файла");
+            throw runtime_error("tried to read a directory instead of a file");
         }
     }
-    throw runtime_error(string("объект ") + name + " не найден в текущем каталоге");
+    throw runtime_error(string("object ") + name + " not found in the current directory");
 }
 
 void FileSystem::write(char name[32], vector <char> buffer){
@@ -478,18 +478,18 @@ void FileSystem::write(char name[32], vector <char> buffer){
             ut.load(parser, superblock.users_table);
             for(auto uid : auth_usrs.AuthorizedUsers){
                 int usr_index = ut.search(uid);
-                if(usr_index == -1) throw runtime_error(string("пользователь не найден при попытке записать в файл ") + name);
+                if(usr_index == -1) throw runtime_error(string("user not found while writing to file ") + name);
                 all_user_keys.push_back(vector(ut.users_vec[usr_index].key, ut.users_vec[usr_index].key + 32 * sizeof(uint8_t)));
             }
             enfd.write(parser, encryption, curr_uid, buffer, allocator, all_user_keys);
             enfd.save(parser, ft.table_node_vec[index].addr);
         }
         else{
-            throw runtime_error("попытались записать в каталог вместо файла");
+            throw runtime_error("tried to write to a directory instead of a file");
         }
         return;
     }
-    throw runtime_error("файл не найден");
+    throw runtime_error("file not found");
 }
 
 void FileSystem::get_info(char name[32]){
@@ -519,14 +519,14 @@ void FileSystem::get_info(char name[32]){
         }
         return;
     }
-    throw runtime_error(string("файл ") + name + " для операции get_info() не найден");
+    throw runtime_error(string("file ") + name + " not found for get_info()");
 }
 
 void FileSystem::remove(char name[32]){
     FolderDescriptor fd;
     fd.load(parser, curr_folder);
     if(!fd.can_write(parser, curr_uid)) throw runtime_error(string
-        ("текущий пользователь не может удалять из каталога ") + curr_folder_name);
+        ("current user cannot delete from directory ") + curr_folder_name);
     fd.remove(parser, allocator, name);
 }
 
@@ -535,7 +535,7 @@ void FileSystem::rename(char name[32], char new_name[32]){
     FolderDescriptor fd;
     fd.load(parser, curr_folder);
     if(!fd.can_write(parser, curr_uid)) throw runtime_error(string
-        ("текущий пользователь не может переименовывать объекты каталога ") + curr_folder_name);
+        ("current user cannot rename objects in directory ") + curr_folder_name);
     fd.rename(parser, name, new_name);
 }
 
@@ -554,12 +554,12 @@ void FileSystem::move(char name[32], std::string path){
     fd.load(parser, curr_folder);
     int type;
     parser.read(dest_addr, reinterpret_cast<char*>(&type), sizeof(int));
-    if(type != 3) throw runtime_error("Выбранный файл не является каталогом");
+    if(type != 3) throw runtime_error("the selected object is not a directory");
     FolderDescriptor dest_fd;
     dest_fd.load(parser, dest_addr);
 
     if(!fd.can_write(parser, curr_uid) || !dest_fd.can_write(parser, curr_uid)) throw runtime_error(string
-        ("текущий пользователь не может переместить объект из каталога ") + curr_folder_name);
+        ("move requires write access to both the source and the destination directory; current directory: ") + curr_folder_name);
     fd.move(allocator, parser, name, dest_addr);
 }
 
@@ -577,11 +577,11 @@ void FileSystem::copy(char name[32], std::string path){
     fd.load(parser, curr_folder);
     int type;
     parser.read(dest_addr, reinterpret_cast<char*>(&type), sizeof(int));
-    if(type != 3) throw runtime_error("Выбранный файл не является каталогом");
+    if(type != 3) throw runtime_error("the selected object is not a directory");
     FolderDescriptor dest_folder;
     dest_folder.load(parser, dest_addr);
     if(!fd.can_write(parser, curr_uid) || !dest_folder.can_write(parser, curr_uid)) throw runtime_error(string
-        ("текущий пользователь не может скопировать объект каталога ") + curr_folder_name);
+        ("copy requires write access to both the source and the destination directory; current directory: ") + curr_folder_name);
     fd.copy(parser, allocator, name, dest_addr);
 }
 
@@ -593,7 +593,7 @@ void FileSystem::set_acl(char user_name[32], char name[32], bool can_read, bool 
     int uid = users_table.search_uid_by_name(user_name);
 
     if(uid == -1){
-        throw runtime_error(string("Для set_acl пользователя с именем ") + user_name + " нет в системе");
+        throw runtime_error(string("set_acl: user ") + user_name + " does not exist");
     }
 
     FolderDescriptor fd;
@@ -609,7 +609,7 @@ void FileSystem::set_acl(char user_name[32], char name[32], bool can_read, bool 
             cfd.load(parser, ft.table_node_vec[index].addr);
 
             if(cfd.owner_id != curr_uid) throw 
-            runtime_error(string("текущий пользователь не является владельцем обычного файла ") + name);
+            runtime_error(string("current user is not the owner of the regular file ") + name);
 
             FileACList acl;
             acl.load(parser, cfd.acl_addr);
@@ -635,7 +635,7 @@ void FileSystem::set_acl(char user_name[32], char name[32], bool can_read, bool 
             enfd.load(parser, ft.table_node_vec[index].addr);
 
             if(enfd.owner_id != curr_uid) throw 
-            runtime_error(string("текущий пользователь не является владельцем зашифрованного файла ") 
+            runtime_error(string("current user is not the owner of the encrypted file ") 
             + name);
 
             UsersTable ut = UsersTable(superblock);
@@ -669,7 +669,7 @@ void FileSystem::set_acl(char user_name[32], char name[32], bool can_read, bool 
 
         if(type == 3){
             if(curr_uid != users_table.users_vec[0].id) throw 
-            runtime_error("только админ может менять права для пользователей в каталоге");
+            runtime_error("only the admin can change user rights on a directory");
             FolderDescriptor fod;
             fod.load(parser, ft.table_node_vec[index].addr);
 
@@ -693,17 +693,17 @@ void FileSystem::set_acl(char user_name[32], char name[32], bool can_read, bool 
         }
         return;
     }
-    throw runtime_error(string("файл ") + name + " не найден");
+    throw runtime_error(string("file ") + name + " not found");
 }
 
 void FileSystem::check_name(const string& name){
-    if(name.size() == 0) throw runtime_error("название длины 0 недопустимо");
-    if(name.size() > 31) throw runtime_error("название больше длины 31 недопустимо");
-    if(name == "." || name == "..") throw runtime_error("название '.' и '..' недопустимо");
+    if(name.size() == 0) throw runtime_error("a name of length 0 is not allowed");
+    if(name.size() > 31) throw runtime_error("a name longer than 31 characters is not allowed");
+    if(name == "." || name == "..") throw runtime_error("the names '.' and '..' are not allowed");
 
     const string allowed = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-";
     if(name.find_first_not_of(allowed) != string::npos) throw 
-    runtime_error("в имени допустимы только латиница, цифры и . _ -");
+    runtime_error("only Latin letters, digits and . _ - are allowed in names");
 }
 
 void FileSystem::stats(){

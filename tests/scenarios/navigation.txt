@@ -1,0 +1,15 @@
+mkfs 10000 admin
+login admin
+create file0 1 1
+write file0 this is file0
+mkdir folder1 1 1 1
+cd folder1
+create file1 1 1
+write file1 this is file1
+mkdir folder2 1 1 1
+cd folder2
+pwd
+cd ..
+read file1
+cd /
+read file0

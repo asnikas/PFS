@@ -45,7 +45,7 @@ void UsersTable::save(Parser& parser, int addr){
 void UsersTable::load(Parser& parser, int addr){
     int size = superblock.users_table_size;
     if(size < 0 || size > 1000){
-        cout << "невалидный размер size для UsersTable при чтении из Superblock\n";
+        cout << "invalid size while loading UsersTable from Superblock\n";
         return;
     }
     users_vec.resize(size); //выделяем место для вектора

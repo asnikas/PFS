@@ -73,9 +73,9 @@ vector <char> CommonFileDescriptor::read(Parser& parser, int uid){
             parser.read(addr, buffer.data(), size);
             return buffer;
         }
-        throw runtime_error("поток MAIN не найден в файле");
+        throw runtime_error("MAIN stream not found in the file");
     }
-    throw runtime_error("текущий пользователь не может прочитать файл");
+    throw runtime_error("current user cannot read this file");
 }
 
 void CommonFileDescriptor::write(Parser& parser, int uid, vector<char> buffer, Allocator& allocator){
@@ -102,9 +102,9 @@ void CommonFileDescriptor::write(Parser& parser, int uid, vector<char> buffer, A
             if(old_addr != -1) allocator.free(old_addr); //старые данные не нужны, их заменил buffer
             return;
         }
-        throw runtime_error("поток MAIN не найден в файле");
+        throw runtime_error("MAIN stream not found in the file");
     }
-    throw runtime_error("текущий пользователь не может писать в этот файл");
+    throw runtime_error("current user cannot write to this file");
 }
 
 void CommonFileDescriptor::save(Parser& parser, int addr){

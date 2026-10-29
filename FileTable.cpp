@@ -24,7 +24,7 @@ void FileTable::add(char name[32], int addr){
         table_node_vec.emplace_back(name, addr);
         return;
     }
-    throw runtime_error(string("название ") + name + " уже есть в FileTable"); //string + что-то = string
+    throw runtime_error(string("name ") + name + " already exists in FileTable"); //string + что-то = string
 }
 
 void FileTable::remove(char name[32]){
@@ -33,7 +33,7 @@ void FileTable::remove(char name[32]){
         table_node_vec.erase(table_node_vec.begin() + index);
         return;
     }
-    throw runtime_error("при удалении элемента возникла ошибка (FileTable, метод remove)");
+    throw runtime_error("error while removing an element (FileTable, remove)");
 }
 
 void FileTable::save(Parser& parser, int addr){
@@ -47,7 +47,7 @@ void FileTable::load(Parser& parser, int addr){
     int size;
     parser.read(addr, reinterpret_cast<char*>(&size), sizeof(size));
     if(size < 0 || size > 1000){
-        cout << "невалидный размер size для FileTable при чтении из Parser\n";
+        cout << "invalid size while loading FileTable from Parser\n";
         return;
     }
     table_node_vec.resize(size); //выделяем место для вектора

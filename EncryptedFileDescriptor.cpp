@@ -26,11 +26,11 @@ void EncryptedFileDescriptor::get_info(Parser& parser){
 
     CommonFileDescriptor::get_info(parser);
 
-    cout << "Это зашифрованный файл" << endl;
+    cout << "This is an encrypted file" << endl;
     
     AuthorizedUsers au;
     au.load(parser, authorized_usr_addr);
-    cout << "Авторизованных пользователей: " << au.AuthorizedUsers.size() << endl;
+    cout << "Authorized users: " << au.AuthorizedUsers.size() << endl;
 }
 
 bool EncryptedFileDescriptor::set_acl(Parser& parser, Allocator& allocator, Encryption& encryption, int actor_uid, int uid, bool can_read, bool can_write, vector <uint8_t> actor_key, vector <uint8_t> user_key){
@@ -107,7 +107,7 @@ vector <char> EncryptedFileDescriptor::read(Parser& parser, Encryption& encrypti
 
             strncpy(name, "MAIN", 31);
             int m_index = table.search(name);
-            if(m_index == -1) throw runtime_error("не найден поток MAIN при прочтении зшифрованного файла");
+            if(m_index == -1) throw runtime_error("MAIN stream not found when reading the encrypted file");
             int m_addr = table.stream_desc_vec[m_index].addr;
             int m_size = table.stream_desc_vec[m_index].size;
             vector <uint8_t> data_buffer(m_size);
@@ -117,15 +117,15 @@ vector <char> EncryptedFileDescriptor::read(Parser& parser, Encryption& encrypti
 
             return vector<char>(data_buffer.begin(), data_buffer.end());
         }
-        throw runtime_error("не найжен поток SYMEKY или пользователь не может расшифровать файл");
+        throw runtime_error("SYMKEY stream not found or the user cannot decrypt the file");
     }
-    throw runtime_error("текущий пользователь не может читать из зашифрованного файла");
+    throw runtime_error("current user cannot read this encrypted file");
 }
 
 void EncryptedFileDescriptor::write(Parser& parser, Encryption& encryption, int uid, vector<char> buffer, Allocator& allocator, vector<vector <uint8_t>> all_user_keys){
 
     if(!can_write(parser, uid)) throw 
-    runtime_error("текущий пользователь не может записать в encrypted file descriptor");
+    runtime_error("current user cannot write to this encrypted file");
 
     StreamTable table;
     AuthorizedUsers auth_users;
@@ -140,9 +140,9 @@ void EncryptedFileDescriptor::write(Parser& parser, Encryption& encryption, int 
     int n = auth_users.AuthorizedUsers.size();
 
     if(main_index == -1 || symkey_index == -1 || auth_users.search(uid) == -1) throw
-    runtime_error("не известен индекс потока MAIN, или SYMKEY, или пользователь не имеет доступа к файлу");
+    runtime_error("MAIN or SYMKEY stream index is unknown, or the user has no access to the file");
     if(all_user_keys.size() < n) throw 
-    runtime_error("кол-во ключей пользователей не соответствует кол-ву пользоватлей, имеющих доступ к файлу");
+    runtime_error("number of user keys does not match the number of users with access to the file");
 
     vector <uint8_t> file_key = encryption.generate_key();
     vector <uint8_t> data_buffer(buffer.begin(), buffer.end());
@@ -156,9 +156,9 @@ void EncryptedFileDescriptor::write(Parser& parser, Encryption& encryption, int 
     try{
         // сначала место под оба потока, потом запись
         if(!table.grow(parser, allocator, main_index, size)) throw
-        runtime_error("не получилось увеличить поток MAIN, закончилось место в образе");
+        runtime_error("could not grow the MAIN stream: the image is out of space");
         if(!table.grow(parser, allocator, symkey_index, n * 32)) throw
-        runtime_error("не получилось увеличить поток SYMKEY, закончилось место в образе");
+        runtime_error("could not grow the SYMKEY stream: the image is out of space");
 
         table.stream_desc_vec[main_index].size = size;
         table.stream_desc_vec[symkey_index].size = n * 32;

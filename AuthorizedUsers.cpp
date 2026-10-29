@@ -17,7 +17,7 @@ void AuthorizedUsers::add(int uid){
 void AuthorizedUsers::remove(int uid){
     int index = search(uid);
     if(index != -1) AuthorizedUsers.erase(AuthorizedUsers.begin() + index);
-    else cout << "Такого пользователя для remove в authorized users нет" << endl;
+    else cout << "No such user to remove from authorized users" << endl;
 }
 
 void AuthorizedUsers::save(Parser& parser, int addr){

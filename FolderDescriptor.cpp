@@ -61,10 +61,10 @@ void FolderDescriptor::show(Parser& parser){
     FileTable file_table;
     file_table.load(parser, file_table_addr);
 
-    cout << "Кол-во элементов: " << file_table.table_node_vec.size() << endl;
+    cout << "Items: " << file_table.table_node_vec.size() << endl;
 
     for(auto el:file_table.table_node_vec){
-        cout << "Название: " << el.name << " Адрес: " << el.addr << endl;
+        cout << "Name: " << el.name << " Address: " << el.addr << endl;
     }
 }
 
@@ -209,7 +209,7 @@ void FolderDescriptor::copy(Parser& parser, Allocator& allocator, char name[32],
             int type;
             parser.read(dest_addr, reinterpret_cast<char*>(&type), sizeof(int));
             if(type != 3) throw runtime_error("dest_addr " + to_string(dest_addr) + 
-            " в FolderDescriptor copy для каталога указывает не на каталог");
+            " in FolderDescriptor copy does not point to a directory");
 
             FolderDescriptor dest_folder;
             dest_folder.load(parser, dest_addr);
@@ -217,10 +217,10 @@ void FolderDescriptor::copy(Parser& parser, Allocator& allocator, char name[32],
             dest_ft.load(parser, dest_folder.file_table_addr);
 
             if(dest_ft.search(name) != -1) throw 
-            runtime_error("В destination каталоге уже есть объект с таким именем");
+            runtime_error("the destination directory already contains an object with this name");
 
             if(is_inside(parser, file_addr, dest_addr)) throw 
-            runtime_error("нельзя скопировать файл в один из его внутренних файлов");
+            runtime_error("cannot copy a directory into one of its own subdirectories");
 
             FolderDescriptor folder_descriptor;
             folder_descriptor.load(parser, file_addr);
@@ -284,7 +284,7 @@ void FolderDescriptor::copy(Parser& parser, Allocator& allocator, char name[32],
         }
     }
     else{
-        throw runtime_error(string("объект ") + name + " не найден в текущем каталоге");
+        throw runtime_error(string("object ") + name + " not found in the current directory");
     }
 }
 
@@ -296,14 +296,14 @@ void FolderDescriptor::move(Allocator& allocator, Parser& parser, char name[32],
     FolderDescriptor dest_folder;
     dest_folder.load(parser, dest_addr);
     if(file_table_addr == dest_folder.file_table_addr){
-        throw runtime_error("перенос происходит в тот же файл, операция отменена");
+        throw runtime_error("the destination is the same directory, operation cancelled");
     }
 
     FileTable file_table;
     file_table.load(parser, file_table_addr);
     int index = file_table.search(name);
     if(index != -1){
-        if(is_inside(parser, file_table.table_node_vec[index].addr, dest_addr)) throw runtime_error("Нельзя перенести файл во внутренний файл");
+        if(is_inside(parser, file_table.table_node_vec[index].addr, dest_addr)) throw runtime_error("cannot move a directory into itself or into one of its subdirectories");
         FileTable dest_ft;
         dest_ft.load(parser, dest_folder.file_table_addr);
 
@@ -314,7 +314,7 @@ void FolderDescriptor::move(Allocator& allocator, Parser& parser, char name[32],
         dest_ft.table_node_vec.size() * sizeof(TableNode));
 
         if(new_dest_ft_addr == -1){
-            cout << "образ закончился в методе move класса FolderDescriptor" << endl;
+            cout << "image is full in FolderDescriptor::move" << endl;
             return;
         }
         int old_dest_ft_addr = dest_folder.file_table_addr;
@@ -327,7 +327,7 @@ void FolderDescriptor::move(Allocator& allocator, Parser& parser, char name[32],
         allocator.free(old_dest_ft_addr);
     }
     else{
-        throw runtime_error("название " + string(name) + " не найдено в каталоге при операции move");
+        throw runtime_error("name " + string(name) + " not found in the directory during move");
     }
 }
 
@@ -354,7 +354,7 @@ void FolderDescriptor::remove(Parser& parser, Allocator& allocator, char name[32
     FileTable ft;
     ft.load(parser, file_table_addr);
     int index = ft.search(name);
-    if(index == -1) throw runtime_error(string("объект ") + name + " отсутствует в данном каталоге");
+    if(index == -1) throw runtime_error(string("object ") + name + " is not in this directory");
     int type;
     parser.read(ft.table_node_vec[index].addr, reinterpret_cast<char*>(&type), sizeof(int));
     if(type == 3){
@@ -363,7 +363,7 @@ void FolderDescriptor::remove(Parser& parser, Allocator& allocator, char name[32
         FileTable file_table;
         file_table.load(parser, fd.file_table_addr);
         if(file_table.table_node_vec.size() != 0) throw
-        runtime_error("нельзя удалить каталог, содержащий в себе элементы, удалите все элементы каталога");
+        runtime_error("cannot remove a directory that contains elements, remove all of its elements first");
     }
 
     int obj_addr = ft.table_node_vec[index].addr; //после ft.remove индекс уже не действителен
