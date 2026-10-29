@@ -8,15 +8,15 @@ The goal of this project was to understand how a file system is structured on a 
 
 ## Features
 
-- **On-disk format** A packed binary layout: superblock, descriptors, tables and data blocks. The superblock carries a magic number that also identifies the format version, so a foreign or old-format image is refused instead of being misread.
-- **Block allocator** Every block has a header and a footer. Allocation is first-fit with block splitting; freeing merges neighbouring free blocks, zeroes (replaces information with NUL bytes) the released data, and gives a free block at the end of the heap back to the untouched tail. Invalid or repeated `free` is rejected.
-- **Users and access control** An administrator is created together with the image; more users are added with `register`. Files carry read/write ACLs, directories carry read/write/traverse ACLs. Rights are granted by user name with `set_acl`. Entering a directory needs the traverse right; listing it needs the read right.
-- **Files** Regular files and encrypted files (each file has a data stream (MAIN) and, for encrypted files, a key stream (SYMKEY)). Encryption is a simple XOR cipher, see [Limitations](#limitations).
-- **Directories and paths** Nested directories, `cd`, `cd ..`, `pwd`, a prompt that shows the user and the current path, and `copy` / `move` by path, including whole directory trees (a directory cannot be moved into itself).
-- **Host files** `import` and `export` move any file (text, images, audio, etc.) between the image and the real disk.
-- **Diagnostics** `stats` reports free and used blocks, the largest free block, service overhead and fragmentation. `get_info` shows size, ACL and dates of a file, and the ACL of a directory.
-- **Failure handling** Operations that allocate several blocks roll back (free the already allocated memory) when something fails, for example when the image is full, so a failed operation does not leak space or damage existing data.
-- **Shell** `help`, `login` / `logout`, a coloured prompt and coloured errors (only in a terminal, never in redirected output).
+- **On-disk format:** A packed binary layout: superblock, descriptors, tables and data blocks. The superblock carries a magic number that also identifies the format version, so a foreign or old-format image is refused instead of being misread.
+- **Block allocator:** Every block has a header and a footer. Allocation is first-fit with block splitting; freeing merges neighbouring free blocks, zeroes (replaces information with NUL bytes) the released data, and gives a free block at the end of the heap back to the untouched tail. Invalid or repeated `free` is rejected.
+- **Users and access control:** An administrator is created together with the image; more users are added with `register`. Files carry read/write ACLs, directories carry read/write/traverse ACLs. Rights are granted by user name with `set_acl`. Entering a directory needs the traverse right; listing it needs the read right.
+- **Files:** Regular files and encrypted files (each file has a data stream (MAIN) and, for encrypted files, a key stream (SYMKEY)). Encryption is a simple XOR cipher, see [Limitations](#limitations).
+- **Directories and paths:** Nested directories, `cd`, `cd ..`, `pwd`, a prompt that shows the user and the current path, and `copy` / `move` by path, including whole directory trees (a directory cannot be moved into itself).
+- **Host files:** `import` and `export` move any file (text, images, audio, etc.) between the image and the real disk.
+- **Diagnostics:** `stats` reports free and used blocks, the largest free block, service overhead and fragmentation. `get_info` shows size, ACL and dates of a file, and the ACL of a directory.
+- **Failure handling:** Operations that allocate several blocks roll back (free the already allocated memory) when something fails, for example when the image is full, so a failed operation does not leak space or damage existing data.
+- **Shell:** `help`, `login` / `logout`, a coloured prompt and coloured errors (only in a terminal, never in redirected output).
 
 ## Build
 
@@ -115,11 +115,11 @@ All sources are in the repository root; `Name.*` stands for `Name.h` and `Name.c
 
 The project is educational and the scope was cut on purpose to finish it.
 
-- **Not secure** Users have no passwords; anyone can `login` as anyone. User keys are stored in the image in plain text, and the XOR cipher is not cryptographically strong. Access control protects against mistakes inside the shell, not against someone who reads the image file directly.
-- **No crash safety** A failure inside an operation is rolled back, but operations are not atomic: a crash or power loss in the middle of a write can leave the image inconsistent. There is no `fsck` and no journal.
-- **Single process** Two programs working on the same image at the same time overwrite each other's changes.
-- **Simple data model** `write` replaces the whole content; there is no append, partial write or truncate.
-- **Terminal** No Tab completion and no command aliases.
+- **Not secure:** Users have no passwords; anyone can `login` as anyone. User keys are stored in the image in plain text, and the XOR cipher is not cryptographically strong. Access control protects against mistakes inside the shell, not against someone who reads the image file directly.
+- **No crash safety:** A failure inside an operation is rolled back, but operations are not atomic: a crash or power loss in the middle of a write can leave the image inconsistent. There is no `fsck` and no journal.
+- **Single process:** Two programs working on the same image at the same time overwrite each other's changes.
+- **Simple data model:** `write` replaces the whole content; there is no append, partial write or truncate.
+- **Terminal:** No Tab completion and no command aliases.
 
 ## Use of AI assistance
 
